@@ -1,0 +1,17 @@
+/*
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+*/
+
+.flash-info {
+    @apply text-blue-600;
+}
+
+.flash-success {
+    @apply text-green-600;
+}
+
+.flash-error {
+    @apply text-red-600;
+}

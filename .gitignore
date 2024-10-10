@@ -1,0 +1,10 @@
+bin/
+
+ui/static/main.css
+
+*.rest
+*.http
+
+.envrc
+.env
+!.devcontainer/.env

@@ -1,0 +1,30 @@
+{{define "base"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{template "title" .}}</title>
+    <link rel="stylesheet" href="/static/main.css">
+</head>
+<body>
+    {{with .Flash}}
+    <div role="status" class="flash-{{.Type}}">
+        {{.Message}}
+    </div>
+    {{end}}
+    {{if .IsAuthenticated}}
+    <nav>
+        <form action="/auth/logout" method="POST">
+            <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+            <button>
+                Logout
+            </button>
+        </form>
+    </nav>
+    {{end}}
+    {{template "main" .}}
+    {{template "scripts" .}}
+</body>
+</html>
+{{end}}

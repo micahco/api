@@ -1,0 +1,19 @@
+{{define "title"}}Register{{end}}
+
+{{define "main"}}
+    <main>
+        <h1>Register</h1>
+        <form action="/auth/register" method="POST">
+            <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+            {{if not .Data.HasSessionEmail}}
+            <label for="email">Email</label>
+            <input type="email" name="email" autocomplete="username" required>
+            {{end}}
+            <label for="password">Password</label>
+            <input type="password" name="password" autocomplete="current-password" required>
+            <button>Create Account</button>
+        </form>
+    </main>
+{{end}}
+
+{{define "scripts"}}{{end}}
