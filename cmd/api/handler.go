@@ -1,13 +1,33 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 
-	"github.com/micahco/web/internal/validator"
+	"github.com/micahco/api/internal/validator"
 )
+
+func (app *application) writeJSON(w http.ResponseWriter, statusCode int, data interface{}, headers http.Header) error {
+	js, err := json.MarshalIndent(data, "", "\t")
+	if err != nil {
+		return err
+	}
+
+	js = append(js, '\n')
+
+	for key, value := range headers {
+		w.Header()[key] = value
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	w.Write(js)
+
+	return nil
+}
 
 type withError func(w http.ResponseWriter, r *http.Request) error
 
@@ -21,24 +41,40 @@ func (app *application) handle(h withError) http.HandlerFunc {
 			// Only the wrapped errors will be logged.
 			var respErr respErr
 			if errors.As(err, &respErr) {
-				// Log wrapped error if exists.
+				// Log wrapped error(s) if exists.
 				if err := errors.Unwrap(respErr); err != nil {
 					app.logger.Error(
-						"handled unwrapped error",
+						"handled unwrapped error(s)",
 						slog.Any("err", err),
 					)
 				}
 
-				http.Error(w, respErr.Message(), respErr.StatusCode())
+				err := app.writeJSON(w, respErr.StatusCode(), respErr.Message(), nil)
+				if err != nil {
+					w.WriteHeader(500)
+					app.logger.Error(
+						"failed to write response error",
+						slog.Any("err", err),
+					)
+				}
+
 				return
 			}
 
 			// Else, send generic internal server error and log.
-			http.Error(
+			err := app.writeJSON(
 				w,
-				http.StatusText(http.StatusInternalServerError),
 				http.StatusInternalServerError,
+				http.StatusText(http.StatusInternalServerError),
+				nil,
 			)
+			if err != nil {
+				w.WriteHeader(500)
+				app.logger.Error(
+					"failed to write internal server error",
+					slog.Any("err", err),
+				)
+			}
 
 			app.logger.Error(
 				"handled unexpected error",

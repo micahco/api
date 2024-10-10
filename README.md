@@ -1,6 +1,6 @@
-# web
+# api
 
-A barebones web template with basic email authentication flow.
+A barebones REST API template with basic email authentication flow.
 
 ## Resources
 

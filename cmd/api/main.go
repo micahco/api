@@ -2,10 +2,8 @@ package main
 
 import (
 	"context"
-	"encoding/gob"
 	"flag"
 	"fmt"
-	"html/template"
 	"log/slog"
 	"net/http"
 	"net/mail"
@@ -13,14 +11,14 @@ import (
 	"os"
 	"time"
 
-	"github.com/alexedwards/scs/pgxstore"
-	"github.com/alexedwards/scs/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lmittmann/tint"
-	"github.com/micahco/web/internal/mailer"
-	"github.com/micahco/web/internal/models"
-	"github.com/micahco/web/ui"
+	"github.com/micahco/api/internal/mailer"
+	"github.com/micahco/api/internal/models"
+	"github.com/micahco/api/ui"
 )
+
+const version = "0.0.1"
 
 type config struct {
 	port int
@@ -38,13 +36,11 @@ type config struct {
 }
 
 type application struct {
-	baseURL        *url.URL
-	config         config
-	logger         *slog.Logger
-	mailer         *mailer.Mailer
-	models         models.Models
-	sessionManager *scs.SessionManager
-	templateCache  map[string]*template.Template
+	baseURL *url.URL
+	config  config
+	logger  *slog.Logger
+	mailer  *mailer.Mailer
+	models  models.Models
 }
 
 func main() {
@@ -107,33 +103,21 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Session manager
-	sm := scs.New()
-	sm.Store = pgxstore.New(pool)
-	sm.Lifetime = 12 * time.Hour
-	gob.Register(FlashMessage{})
-
-	// Template cache
-	tc, err := newTemplateCache()
-	if err != nil {
-		logger.Error("unable to create template cache", slog.Any("err", err))
-		os.Exit(1)
-	}
-
 	app := &application{
-		baseURL:        baseURL,
-		config:         cfg,
-		logger:         logger,
-		mailer:         mailer,
-		models:         models.New(pool),
-		sessionManager: sm,
-		templateCache:  tc,
+		baseURL: baseURL,
+		config:  cfg,
+		logger:  logger,
+		mailer:  mailer,
+		models:  models.New(pool),
 	}
 
 	srv := &http.Server{
-		Addr:     fmt.Sprintf(":%d", cfg.port),
-		Handler:  app.routes(),
-		ErrorLog: errLog,
+		Addr:         fmt.Sprintf(":%d", cfg.port),
+		Handler:      app.routes(),
+		ErrorLog:     errLog,
+		IdleTimeout:  time.Minute,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 30 * time.Second,
 	}
 
 	logger.Info("starting server", "addr", srv.Addr)

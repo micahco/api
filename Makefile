@@ -25,23 +25,23 @@ audit:
 	@echo "Running tests..."
 	go test -race -vet=off ./...
 	
-## build: build the cmd/web application
+## build: build the cmd/api application
 .PHONY: build
 build:
-	@echo "Building cmd/web..."
-	go build -ldflags="-s" -o=./bin/web ./cmd/web
+	@echo "Building cmd/api..."
+	go build -ldflags="-s" -o=./bin/api ./cmd/api
 
-## run: run the cmd/web application
+## run: run the cmd/api application
 .PHONY: run
 run:
-	go run ./cmd/web -port=4000 -dev \
-		-url=${WEB_BASE_URL} \
+	go run ./cmd/api -port=4000 -dev \
+		-url=${API_BASE_URL} \
 		-db-dsn=${DATABASE_URL} \
-		-smtp-host=${WEB_SMTP_HOST} \
-		-smtp-port=${WEB_SMTP_PORT} \
-		-smtp-user=${WEB_SMTP_USER} \
-		-smtp-pass=${WEB_SMTP_PASS} \
-		-smtp-addr=${WEB_SMTP_ADDR}
+		-smtp-host=${API_SMTP_HOST} \
+		-smtp-port=${API_SMTP_PORT} \
+		-smtp-user=${API_SMTP_USER} \
+		-smtp-pass=${API_SMTP_PASS} \
+		-smtp-addr=${API_SMTP_ADDR}
 
 ## db/psql: connect to the database using psql
 .PHONY: db/psql
@@ -65,13 +65,3 @@ db/migrations/up: confirm
 db/migrations/drop: confirm
 	@echo "Dropping the entire database schema..."
 	migrate -path ./migrations -database ${DATABASE_URL} drop
-
-## css/build: build tailwind styles
-.PHONY: css/build
-css/build:
-	tailwindcss -i ./ui/web/input.css -o ./ui/static/main.css --minify
-
-## css/watch: watch tailwind styles
-.PHONY: css/watch
-css/watch:
-	tailwindcss -i ./ui/web/input.css -o ./ui/static/main.css --watch
