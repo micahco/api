@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-
-	"github.com/micahco/api/internal/validator"
 )
 
 func (app *application) writeJSON(w http.ResponseWriter, statusCode int, data interface{}, headers http.Header) error {
@@ -115,11 +113,4 @@ func (e respErr) Message() string {
 	}
 
 	return http.StatusText(e.statusCode)
-}
-
-func validationError(v validator.Validator) error {
-	return respErr{
-		statusCode: http.StatusUnprocessableEntity,
-		message:    v.Errors(),
-	}
 }
