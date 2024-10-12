@@ -1,31 +1,11 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 )
-
-func (app *application) writeJSON(w http.ResponseWriter, statusCode int, data interface{}, headers http.Header) error {
-	js, err := json.MarshalIndent(data, "", "\t")
-	if err != nil {
-		return err
-	}
-
-	js = append(js, '\n')
-
-	for key, value := range headers {
-		w.Header()[key] = value
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-	w.Write(js)
-
-	return nil
-}
 
 type withError func(w http.ResponseWriter, r *http.Request) error
 
@@ -39,45 +19,21 @@ func (app *application) handle(h withError) http.HandlerFunc {
 			// Only the wrapped errors will be logged.
 			var respErr respErr
 			if errors.As(err, &respErr) {
-				// Log wrapped error(s) if exists.
+				// Log wrapped error(s) if exists
 				if err := errors.Unwrap(respErr); err != nil {
 					app.logger.Error(
-						"handled unwrapped error(s)",
+						"handled unwrapped error",
 						slog.Any("err", err),
 					)
 				}
 
-				err := app.writeJSON(w, respErr.StatusCode(), respErr.Message(), nil)
-				if err != nil {
-					w.WriteHeader(500)
-					app.logger.Error(
-						"failed to write response error",
-						slog.Any("err", err),
-					)
-				}
+				app.errorResponse(w, respErr.StatusCode(), respErr.Message())
 
 				return
 			}
 
-			// Else, send generic internal server error and log.
-			err := app.writeJSON(
-				w,
-				http.StatusInternalServerError,
-				http.StatusText(http.StatusInternalServerError),
-				nil,
-			)
-			if err != nil {
-				w.WriteHeader(500)
-				app.logger.Error(
-					"failed to write internal server error",
-					slog.Any("err", err),
-				)
-			}
-
-			app.logger.Error(
-				"handled unexpected error",
-				slog.Any("err", err),
-			)
+			// Else, respond with internal server error
+			app.serverErrorResponse(w, "handled unexpected error", err)
 		}
 	}
 }

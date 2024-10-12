@@ -41,7 +41,8 @@ run:
 		-smtp-port=${API_SMTP_PORT} \
 		-smtp-user=${API_SMTP_USER} \
 		-smtp-pass=${API_SMTP_PASS} \
-		-smtp-addr=${API_SMTP_ADDR}
+		-smtp-addr=${API_SMTP_ADDR} \
+		-limiter-enabled=false
 
 ## db/psql: connect to the database using psql
 .PHONY: db/psql

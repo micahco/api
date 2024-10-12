@@ -3,9 +3,7 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"log/slog"
-	"net/http"
 	"net/mail"
 	"net/url"
 	"os"
@@ -25,6 +23,11 @@ type config struct {
 	dev  bool
 	db   struct {
 		dsn string
+	}
+	limiter struct {
+		rps     float64
+		burst   int
+		enabled bool
 	}
 	smtp struct {
 		host     string
@@ -60,6 +63,10 @@ func main() {
 	flag.StringVar(&cfg.smtp.password, "smtp-pass", "", "SMTP password")
 	flag.StringVar(&cfg.smtp.sender, "smtp-addr", "", "SMTP sender address")
 
+	flag.Float64Var(&cfg.limiter.rps, "limiter-rps", 2, "Rate limiter maximum requests per second")
+	flag.IntVar(&cfg.limiter.burst, "limiter-burst", 4, "Rate limiter maximum burst")
+	flag.BoolVar(&cfg.limiter.enabled, "limiter-enabled", true, "Enable rate limiter")
+
 	flag.Parse()
 
 	// Logger
@@ -71,15 +78,13 @@ func main() {
 	// Base URL
 	baseURL, err := url.Parse(urlstr)
 	if err != nil {
-		logger.Error("unable to parse url", slog.Any("err", err))
-		os.Exit(1)
+		fatal(logger, err)
 	}
 
 	// PostgreSQL
 	pool, err := openPool(cfg)
 	if err != nil {
-		logger.Error("unable to open pgpool", slog.Any("err", err))
-		os.Exit(1)
+		fatal(logger, err)
 	}
 	defer pool.Close()
 
@@ -99,8 +104,7 @@ func main() {
 		"mail/*.tmpl",
 	)
 	if err != nil {
-		logger.Error("unable to create mailer", slog.Any("err", err))
-		os.Exit(1)
+		fatal(logger, err)
 	}
 
 	app := &application{
@@ -111,18 +115,10 @@ func main() {
 		models:  models.New(pool),
 	}
 
-	srv := &http.Server{
-		Addr:         fmt.Sprintf(":%d", cfg.port),
-		Handler:      app.routes(),
-		ErrorLog:     errLog,
-		IdleTimeout:  time.Minute,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 30 * time.Second,
+	err = app.serve(errLog)
+	if err != nil {
+		fatal(logger, err)
 	}
-
-	logger.Info("starting server", "addr", srv.Addr)
-	err = srv.ListenAndServe()
-	logger.Error(err.Error())
 }
 
 func openPool(cfg config) (*pgxpool.Pool, error) {
@@ -154,6 +150,11 @@ func newSlogHandler(cfg config) slog.Handler {
 
 	// Production use JSON handler with default opts
 	return slog.NewJSONHandler(os.Stdout, nil)
+}
+
+func fatal(logger *slog.Logger, err error) {
+	logger.Error("fatal", slog.Any("err", err))
+	os.Exit(1)
 }
 
 func (app *application) background(fn func()) {

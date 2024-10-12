@@ -10,6 +10,7 @@ import (
 func (app *application) routes() http.Handler {
 	r := chi.NewRouter()
 	r.Use(app.recovery)
+	r.Use(app.rateLimit)
 
 	r.NotFound(app.handle(app.handleNotFound))
 	r.MethodNotAllowed(app.handle(app.handleMethodNotAllowed))
@@ -22,19 +23,9 @@ func (app *application) routes() http.Handler {
 }
 
 func (app *application) handleNotFound(w http.ResponseWriter, r *http.Request) error {
-	return app.writeJSON(
-		w,
-		http.StatusNotFound,
-		http.StatusText(http.StatusNotFound),
-		nil,
-	)
+	return respErr{nil, http.StatusNotFound, http.StatusText(http.StatusNotFound)}
 }
 
 func (app *application) handleMethodNotAllowed(w http.ResponseWriter, r *http.Request) error {
-	return app.writeJSON(
-		w,
-		http.StatusMethodNotAllowed,
-		http.StatusText(http.StatusMethodNotAllowed),
-		nil,
-	)
+	return respErr{nil, http.StatusMethodNotAllowed, http.StatusText(http.StatusMethodNotAllowed)}
 }

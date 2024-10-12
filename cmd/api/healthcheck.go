@@ -1,6 +1,8 @@
 package main
 
-import "net/http"
+import (
+	"net/http"
+)
 
 func (app *application) handleHealthcheck(w http.ResponseWriter, r *http.Request) error {
 	env := "production"
@@ -8,10 +10,12 @@ func (app *application) handleHealthcheck(w http.ResponseWriter, r *http.Request
 		env = "development"
 	}
 
-	data := map[string]string{
-		"status":      "available",
-		"environment": env,
-		"version":     version,
+	data := envelope{
+		"status": "available",
+		"system_info": map[string]string{
+			"environment": env,
+			"version":     version,
+		},
 	}
 
 	return app.writeJSON(w, http.StatusOK, data, nil)
