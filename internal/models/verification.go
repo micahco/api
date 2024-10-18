@@ -12,104 +12,102 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-const (
-	ttl = time.Hour
-)
-
 type VerificationModel struct {
 	pool *pgxpool.Pool
 }
 
 type Verification struct {
+	Plaintext string
 	Hash      []byte
 	Email     string
 	Expiry    time.Time
-	CreatedAt time.Time
 }
 
-func (v *Verification) IsExpired() bool {
-	return time.Now().After(v.Expiry)
-}
-
-func scanVerification(row pgx.CollectableRow) (*Verification, error) {
-	var v Verification
-	err := row.Scan(
-		&v.Hash,
-		&v.Email,
-		&v.Expiry,
-		&v.CreatedAt)
-
-	return &v, err
-}
-
-// Create new verification token. Store hash in database and return token.
-func (m *VerificationModel) New(email string) (string, error) {
-	expiry := time.Now().Add(ttl)
-
-	b := make([]byte, 16)
-	_, err := rand.Read(b)
-	if err != nil {
-		return "", err
-	}
-
-	token := base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(b)
-	// Note: sum is a byte array, while hash is a slice
-	sum := sha256.Sum256([]byte(token))
-	hash := sum[:]
-
-	sql := `INSERT INTO verification_
-		(hash_, email_, expiry_)
-		VALUES($1, $2, $3);`
-
-	_, err = m.pool.Exec(context.Background(), sql, hash, email, expiry)
-
-	return token, err
-}
-
-func (m *VerificationModel) Get(email string) (*Verification, error) {
-	sql := "SELECT * FROM verification_ WHERE email_ = $1;"
-
-	rows, err := m.pool.Query(context.Background(), sql, email)
+func (m VerificationModel) New(email string) (*Verification, error) {
+	ttl := time.Hour * 36
+	v, err := generateVerification(email, ttl)
 	if err != nil {
 		return nil, err
 	}
 
-	v, err := pgx.CollectOneRow(rows, scanVerification)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, ErrNoRecord
-	}
-
+	err = m.Insert(v)
 	return v, err
 }
 
-func (m *VerificationModel) Verify(token, email string) error {
-	sum := sha256.Sum256([]byte(token))
-	hash := sum[:]
+func (m VerificationModel) Insert(v *Verification) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
 
-	sql := `SELECT * FROM verification_ 
-		WHERE hash_ = $1 AND email_ = $2;`
+	sql := `
+		INSERT INTO verification_ (hash_, email_, expiry_)
+		VALUES($1, $2, $3);`
 
-	rows, err := m.pool.Query(context.Background(), sql, hash, email)
+	args := []interface{}{v.Hash, v.Email, v.Expiry}
+
+	_, err := m.pool.Exec(ctx, sql, args...)
+	return err
+}
+
+func (m VerificationModel) Purge(email string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	sql := `
+		DELETE FROM verification_
+		WHERE email_ = $1;`
+
+	_, err := m.pool.Exec(ctx, sql, email)
+	return err
+}
+
+func (m VerificationModel) Verify(email, token string) error {
+	hash := sha256.Sum256([]byte(token))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	sql := `
+		SELECT expiry_
+		FROM verification_
+		WHERE hash_ = $1
+		AND email_ = $2;`
+
+	args := []interface{}{hash[:], email}
+
+	var expiry time.Time
+	err := m.pool.QueryRow(ctx, sql, args...).Scan(&expiry)
 	if err != nil {
-		return err
+		switch {
+		case errors.Is(err, pgx.ErrNoRows):
+			return ErrRecordNotFound
+		default:
+			return err
+		}
 	}
 
-	v, err := pgx.CollectOneRow(rows, scanVerification)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return ErrNoRecord
-	}
-
-	if v.IsExpired() {
+	if time.Now().After(expiry) {
 		return ErrExpiredVerification
 	}
 
 	return nil
 }
 
-func (m *VerificationModel) Purge(email string) error {
-	sql := "DELETE FROM verification_ WHERE email_ = $1;"
+func generateVerification(email string, ttl time.Duration) (*Verification, error) {
+	v := &Verification{
+		Email:  email,
+		Expiry: time.Now().Add(ttl),
+	}
 
-	_, err := m.pool.Exec(context.Background(), sql, email)
+	randomBytes := make([]byte, 16)
+	_, err := rand.Read(randomBytes)
+	if err != nil {
+		return nil, err
+	}
 
-	return err
+	v.Plaintext = base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(randomBytes)
+
+	hash := sha256.Sum256([]byte(v.Plaintext))
+	v.Hash = hash[:]
+
+	return v, nil
 }

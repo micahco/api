@@ -4,6 +4,7 @@ ui/static/main.css
 
 *.rest
 *.http
+rest/
 
 .envrc
 .env

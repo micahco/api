@@ -2,7 +2,8 @@ CREATE EXTENSION IF NOT EXISTS citext;
 
 CREATE TABLE IF NOT EXISTS user_ (
     id_ BIGSERIAL PRIMARY KEY,
+    created_at_ TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     email_ CITEXT UNIQUE NOT NULL,
     password_hash_ BYTEA NOT NULL,
-    created_at_ TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    version_ integer NOT NULL DEFAULT 1
 );

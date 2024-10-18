@@ -39,9 +39,9 @@ run:
 		-db-dsn=${DATABASE_URL} \
 		-smtp-host=${API_SMTP_HOST} \
 		-smtp-port=${API_SMTP_PORT} \
-		-smtp-user=${API_SMTP_USER} \
-		-smtp-pass=${API_SMTP_PASS} \
-		-smtp-addr=${API_SMTP_ADDR} \
+		-smtp-username=${API_SMTP_USERNAME} \
+		-smtp-password=${API_SMTP_PASSWORD} \
+		-smtp-sender=${API_SMTP_SENDER} \
 		-limiter-enabled=false
 
 ## db/psql: connect to the database using psql

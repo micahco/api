@@ -38,14 +38,6 @@ type config struct {
 	}
 }
 
-type application struct {
-	baseURL *url.URL
-	config  config
-	logger  *slog.Logger
-	mailer  *mailer.Mailer
-	models  models.Models
-}
-
 func main() {
 	var cfg config
 	var urlstr string
@@ -59,9 +51,9 @@ func main() {
 
 	flag.StringVar(&cfg.smtp.host, "smtp-host", "", "SMTP host")
 	flag.IntVar(&cfg.smtp.port, "smtp-port", 2525, "SMTP port")
-	flag.StringVar(&cfg.smtp.username, "smtp-user", "", "SMTP username")
-	flag.StringVar(&cfg.smtp.password, "smtp-pass", "", "SMTP password")
-	flag.StringVar(&cfg.smtp.sender, "smtp-addr", "", "SMTP sender address")
+	flag.StringVar(&cfg.smtp.username, "smtp-username", "", "SMTP username")
+	flag.StringVar(&cfg.smtp.password, "smtp-password", "", "SMTP password")
+	flag.StringVar(&cfg.smtp.sender, "smtp-sender", "", "SMTP sender")
 
 	flag.Float64Var(&cfg.limiter.rps, "limiter-rps", 2, "Rate limiter maximum requests per second")
 	flag.IntVar(&cfg.limiter.burst, "limiter-burst", 4, "Rate limiter maximum burst")
@@ -155,15 +147,4 @@ func newSlogHandler(cfg config) slog.Handler {
 func fatal(logger *slog.Logger, err error) {
 	logger.Error("fatal", slog.Any("err", err))
 	os.Exit(1)
-}
-
-func (app *application) background(fn func()) {
-	go func() {
-		defer func() {
-			if err := recover(); err != nil {
-				app.logger.Error("background", slog.Any("err", err))
-			}
-		}()
-		fn()
-	}()
 }

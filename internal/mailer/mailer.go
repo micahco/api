@@ -57,6 +57,10 @@ func New(host string, port int, username string, password string, sender *mail.A
 }
 
 func (m *Mailer) Send(recepient, tmpl string, data interface{}) error {
+	// DEBUGGING:
+	fmt.Println(data)
+	return nil
+
 	t, ok := m.templateCache[tmpl]
 	if !ok {
 		return fmt.Errorf("template %s does not exist", tmpl)
