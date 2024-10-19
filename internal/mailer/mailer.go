@@ -3,6 +3,7 @@ package mailer
 import (
 	"bytes"
 	"embed"
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"net/mail"
@@ -56,9 +57,14 @@ func New(host string, port int, username string, password string, sender *mail.A
 	return m, nil
 }
 
-func (m *Mailer) Send(recepient, tmpl string, data interface{}) error {
-	// DEBUGGING:
-	fmt.Println(data)
+func (m *Mailer) Send(recepient, tmpl string, data map[string]any) error {
+	json, err := json.MarshalIndent(data, "", "\t")
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(string(json))
+
 	return nil
 
 	t, ok := m.templateCache[tmpl]
@@ -67,7 +73,7 @@ func (m *Mailer) Send(recepient, tmpl string, data interface{}) error {
 	}
 
 	subject := new(bytes.Buffer)
-	err := t.ExecuteTemplate(subject, "subject", data)
+	err = t.ExecuteTemplate(subject, "subject", data)
 	if err != nil {
 		return err
 	}

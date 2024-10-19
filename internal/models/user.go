@@ -23,13 +23,27 @@ type User struct {
 	Version      int       `json:"-"`
 }
 
-func (m UserModel) Insert(user *User, password string) error {
+func (m UserModel) New(email, password string) (*User, error) {
 	hash, err := argon2id.CreateHash(password, argon2id.DefaultParams)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	user := &User{
+		Email:        email,
+		PasswordHash: []byte(hash),
+	}
+
+	err = m.Insert(user)
+	if err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}
+
+func (m UserModel) Insert(user *User) error {
+	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
 	defer cancel()
 
 	sql := `
@@ -37,9 +51,9 @@ func (m UserModel) Insert(user *User, password string) error {
 		VALUES($1, $2)
 		RETURNING id_, created_at_, version_;`
 
-	args := []interface{}{user.Email, hash}
+	args := []any{user.Email, user.PasswordHash}
 
-	err = m.pool.QueryRow(ctx, sql, args...).Scan(&user.ID, &user.CreatedAt, &user.Version)
+	err := m.pool.QueryRow(ctx, sql, args...).Scan(&user.ID, &user.CreatedAt, &user.Version)
 	if err != nil {
 		switch {
 		case pgErrCode(err) == pgerrcode.UniqueViolation:
@@ -53,13 +67,13 @@ func (m UserModel) Insert(user *User, password string) error {
 }
 
 func (m UserModel) GetByEmail(email string) (*User, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
 	defer cancel()
 
 	sql := `
 		SELECT id_, created_at_, email_, password_hash_, version_
-        FROM user_
-        WHERE email = $1`
+		FROM user_
+		WHERE email_ = $1`
 
 	var user User
 	err := m.pool.QueryRow(ctx, sql, email).Scan(
@@ -69,7 +83,6 @@ func (m UserModel) GetByEmail(email string) (*User, error) {
 		&user.PasswordHash,
 		&user.Version,
 	)
-
 	if err != nil {
 		switch {
 		case errors.Is(err, pgx.ErrNoRows):
@@ -83,7 +96,7 @@ func (m UserModel) GetByEmail(email string) (*User, error) {
 }
 
 func (m UserModel) Update(user *User) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
 	defer cancel()
 
 	sql := `
@@ -92,7 +105,7 @@ func (m UserModel) Update(user *User) error {
         WHERE id = $3 AND version = $4
         RETURNING version`
 
-	args := []interface{}{
+	args := []any{
 		user.Email,
 		user.PasswordHash,
 		user.ID,
@@ -113,7 +126,7 @@ func (m UserModel) Update(user *User) error {
 }
 
 func (m UserModel) Authenticate(email, password string) (int, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
 	defer cancel()
 
 	sql := `

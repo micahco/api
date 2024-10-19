@@ -28,9 +28,9 @@ func (app *application) routes() http.Handler {
 }
 
 func (app *application) handleNotFound(w http.ResponseWriter, r *http.Request) error {
-	return respErr{nil, http.StatusNotFound, http.StatusText(http.StatusNotFound)}
+	return app.writeError(w, http.StatusNotFound, nil)
 }
 
 func (app *application) handleMethodNotAllowed(w http.ResponseWriter, r *http.Request) error {
-	return respErr{nil, http.StatusMethodNotAllowed, http.StatusText(http.StatusMethodNotAllowed)}
+	return app.writeError(w, http.StatusMethodNotAllowed, nil)
 }

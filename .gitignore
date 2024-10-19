@@ -2,10 +2,6 @@ bin/
 
 ui/static/main.css
 
-*.rest
-*.http
-rest/
-
 .envrc
 .env
 !.devcontainer/.env

@@ -1,6 +1,12 @@
 package models
 
-import "github.com/jackc/pgx/v5/pgxpool"
+import (
+	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+const ctxTimeout = 3 * time.Second
 
 type Models struct {
 	User         UserModel

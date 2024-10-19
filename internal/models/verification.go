@@ -8,48 +8,101 @@ import (
 	"errors"
 	"time"
 
+	val "github.com/go-ozzo/ozzo-validation"
+	"github.com/go-ozzo/ozzo-validation/is"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// Default expiry duration
+const ttl = time.Hour * 36
 
 type VerificationModel struct {
 	pool *pgxpool.Pool
 }
 
 type Verification struct {
-	Plaintext string
-	Hash      []byte
-	Email     string
-	Expiry    time.Time
+	Hash   []byte    `json:"-"`
+	Email  string    `json:"-"`
+	Expiry time.Time `json:"-"`
 }
 
-func (m VerificationModel) New(email string) (*Verification, error) {
-	ttl := time.Hour * 36
-	v, err := generateVerification(email, ttl)
+func (v *Verification) Validate() error {
+	return val.ValidateStruct(v,
+		val.Field(v.Hash, val.Required),
+		val.Field(v.Email, val.Required),
+		val.Field(v.Expiry, val.Required, is.Email))
+}
+
+// Create and insert new verification for email. Returns the plaintext token
+func (m VerificationModel) New(email string) (string, error) {
+	randomBytes := make([]byte, 16)
+	_, err := rand.Read(randomBytes)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
+	token := base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(randomBytes)
+	// Remember: this is a byte array and must be converted into a slice [:]
+	hash := sha256.Sum256([]byte(token))
+
+	v := &Verification{
+		Hash:   hash[:],
+		Email:  email,
+		Expiry: time.Now().Add(ttl),
+	}
 	err = m.Insert(v)
-	return v, err
+	if err != nil {
+		return "", err
+	}
+
+	return token, err
 }
 
 func (m VerificationModel) Insert(v *Verification) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	err := v.Validate()
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
 	defer cancel()
 
 	sql := `
 		INSERT INTO verification_ (hash_, email_, expiry_)
 		VALUES($1, $2, $3);`
 
-	args := []interface{}{v.Hash, v.Email, v.Expiry}
+	args := []any{v.Hash, v.Email, v.Expiry}
 
-	_, err := m.pool.Exec(ctx, sql, args...)
+	_, err = m.pool.Exec(ctx, sql, args...)
 	return err
 }
 
+func (m VerificationModel) GetByEmail(email string) (*Verification, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
+	defer cancel()
+
+	sql := `
+		SELECT hash_, email_, expiry_
+        FROM verification_
+        WHERE email_ = $1`
+
+	var v Verification
+	err := m.pool.QueryRow(ctx, sql, email).Scan(&v.Hash, &v.Email, &v.Expiry)
+	if err != nil {
+		switch {
+		case errors.Is(err, pgx.ErrNoRows):
+			return nil, ErrRecordNotFound
+		default:
+			return nil, err
+		}
+	}
+
+	return &v, nil
+}
+
 func (m VerificationModel) Purge(email string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
 	defer cancel()
 
 	sql := `
@@ -63,7 +116,7 @@ func (m VerificationModel) Purge(email string) error {
 func (m VerificationModel) Verify(email, token string) error {
 	hash := sha256.Sum256([]byte(token))
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
 	defer cancel()
 
 	sql := `
@@ -72,7 +125,7 @@ func (m VerificationModel) Verify(email, token string) error {
 		WHERE hash_ = $1
 		AND email_ = $2;`
 
-	args := []interface{}{hash[:], email}
+	args := []any{hash[:], email}
 
 	var expiry time.Time
 	err := m.pool.QueryRow(ctx, sql, args...).Scan(&expiry)
@@ -90,24 +143,4 @@ func (m VerificationModel) Verify(email, token string) error {
 	}
 
 	return nil
-}
-
-func generateVerification(email string, ttl time.Duration) (*Verification, error) {
-	v := &Verification{
-		Email:  email,
-		Expiry: time.Now().Add(ttl),
-	}
-
-	randomBytes := make([]byte, 16)
-	_, err := rand.Read(randomBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	v.Plaintext = base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(randomBytes)
-
-	hash := sha256.Sum256([]byte(v.Plaintext))
-	v.Hash = hash[:]
-
-	return v, nil
 }
