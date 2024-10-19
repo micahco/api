@@ -9,13 +9,13 @@ import (
 const ctxTimeout = 3 * time.Second
 
 type Models struct {
-	User         UserModel
-	Verification VerificationModel
+	User              UserModel
+	VerificationToken VerificationTokenModel
 }
 
 func New(pool *pgxpool.Pool) Models {
 	return Models{
-		User:         UserModel{pool},
-		Verification: VerificationModel{pool},
+		User:              UserModel{pool},
+		VerificationToken: VerificationTokenModel{pool},
 	}
 }

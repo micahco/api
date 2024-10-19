@@ -17,25 +17,25 @@ import (
 // Default expiry duration
 const ttl = time.Hour * 36
 
-type VerificationModel struct {
+type VerificationTokenModel struct {
 	pool *pgxpool.Pool
 }
 
 type Verification struct {
-	Hash   []byte    `json:"-"`
-	Email  string    `json:"-"`
-	Expiry time.Time `json:"-"`
+	Hash   []byte
+	Email  string
+	Expiry time.Time
 }
 
-func (v *Verification) Validate() error {
-	return val.ValidateStruct(v,
-		val.Field(v.Hash, val.Required),
-		val.Field(v.Email, val.Required),
-		val.Field(v.Expiry, val.Required, is.Email))
+func (v Verification) Validate() error {
+	return val.ValidateStruct(&v,
+		val.Field(&v.Hash, val.Required),
+		val.Field(&v.Email, val.Required, is.Email),
+		val.Field(&v.Expiry, val.Required))
 }
 
 // Create and insert new verification for email. Returns the plaintext token
-func (m VerificationModel) New(email string) (string, error) {
+func (m VerificationTokenModel) New(email string) (string, error) {
 	randomBytes := make([]byte, 16)
 	_, err := rand.Read(randomBytes)
 	if err != nil {
@@ -59,7 +59,7 @@ func (m VerificationModel) New(email string) (string, error) {
 	return token, err
 }
 
-func (m VerificationModel) Insert(v *Verification) error {
+func (m VerificationTokenModel) Insert(v *Verification) error {
 	err := v.Validate()
 	if err != nil {
 		return err
@@ -69,7 +69,7 @@ func (m VerificationModel) Insert(v *Verification) error {
 	defer cancel()
 
 	sql := `
-		INSERT INTO verification_ (hash_, email_, expiry_)
+		INSERT INTO verification_token_ (hash_, email_, expiry_)
 		VALUES($1, $2, $3);`
 
 	args := []any{v.Hash, v.Email, v.Expiry}
@@ -78,42 +78,39 @@ func (m VerificationModel) Insert(v *Verification) error {
 	return err
 }
 
-func (m VerificationModel) GetByEmail(email string) (*Verification, error) {
+func (m VerificationTokenModel) Exists(email string) (bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
 	defer cancel()
 
 	sql := `
-		SELECT hash_, email_, expiry_
-        FROM verification_
-        WHERE email_ = $1`
+		SELECT EXISTS (
+			SELECT 1
+			FROM verification_token_
+			WHERE email_ = $1
+		);`
 
-	var v Verification
-	err := m.pool.QueryRow(ctx, sql, email).Scan(&v.Hash, &v.Email, &v.Expiry)
+	var exists bool
+	err := m.pool.QueryRow(ctx, sql, email).Scan(&exists)
 	if err != nil {
-		switch {
-		case errors.Is(err, pgx.ErrNoRows):
-			return nil, ErrRecordNotFound
-		default:
-			return nil, err
-		}
+		return false, err
 	}
 
-	return &v, nil
+	return exists, nil
 }
 
-func (m VerificationModel) Purge(email string) error {
+func (m VerificationTokenModel) Purge(email string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
 	defer cancel()
 
 	sql := `
-		DELETE FROM verification_
+		DELETE FROM verification_token_
 		WHERE email_ = $1;`
 
 	_, err := m.pool.Exec(ctx, sql, email)
 	return err
 }
 
-func (m VerificationModel) Verify(email, token string) error {
+func (m VerificationTokenModel) Verify(email, token string) error {
 	hash := sha256.Sum256([]byte(token))
 
 	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
@@ -121,7 +118,7 @@ func (m VerificationModel) Verify(email, token string) error {
 
 	sql := `
 		SELECT expiry_
-		FROM verification_
+		FROM verification_token_
 		WHERE hash_ = $1
 		AND email_ = $2;`
 

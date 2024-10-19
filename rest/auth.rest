@@ -1,4 +1,4 @@
-POST http://localhost:4000/v1/auth/signup HTTP/1.1
+POST http://localhost:4000/v1/tokens/verification HTTP/1.1
 content-type: application/json
 
 {
@@ -7,11 +7,11 @@ content-type: application/json
 
 ###
 
-POST http://localhost:4000/v1/auth/register HTTP/1.1
+POST http://localhost:4000/v1/users HTTP/1.1
 content-type: application/json
 
 {
     "email": "johndoe@gmail.com",
     "password": "helloworld",
-    "token": "FWWGS3ZRHPK4MHDNXS53DUOHNU"
+    "token": "GV562YHTIG6JJIVRDTRZKQH6HI"
 }
