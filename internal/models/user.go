@@ -66,33 +66,24 @@ func (m UserModel) Insert(user *User) error {
 	return nil
 }
 
-func (m UserModel) GetByEmail(email string) (*User, error) {
+func (m UserModel) Exists(email string) (bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
 	defer cancel()
 
 	sql := `
-		SELECT id_, created_at_, email_, password_hash_, version_
-		FROM user_
-		WHERE email_ = $1`
+		SELECT EXISTS (
+			SELECT 1
+			FROM user_
+			WHERE email_ = $1
+		);`
 
-	var user User
-	err := m.pool.QueryRow(ctx, sql, email).Scan(
-		&user.ID,
-		&user.CreatedAt,
-		&user.Email,
-		&user.PasswordHash,
-		&user.Version,
-	)
+	var exists bool
+	err := m.pool.QueryRow(ctx, sql, email).Scan(&exists)
 	if err != nil {
-		switch {
-		case errors.Is(err, pgx.ErrNoRows):
-			return nil, ErrRecordNotFound
-		default:
-			return nil, err
-		}
+		return false, err
 	}
 
-	return &user, nil
+	return exists, nil
 }
 
 func (m UserModel) Update(user *User) error {
@@ -101,8 +92,8 @@ func (m UserModel) Update(user *User) error {
 
 	sql := `
 		UPDATE users 
-        SET email = $1, password_hash = $2, version = version + 1
-        WHERE id = $3 AND version = $4
+        SET email_ = $1, password_hash_ = $2, version_ = version_ + 1
+        WHERE id_ = $3 AND version_ = $4
         RETURNING version`
 
 	args := []any{

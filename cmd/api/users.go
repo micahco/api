@@ -25,7 +25,7 @@ func (app *application) usersPost(w http.ResponseWriter, r *http.Request) error 
 		switch err {
 		case models.ErrRecordNotFound:
 			return app.writeError(w, http.StatusUnauthorized, nil)
-		case models.ErrExpiredVerification:
+		case models.ErrExpiredToken:
 			return app.writeError(w, http.StatusUnauthorized, "Expired token. Please signup again.")
 		default:
 			return err
@@ -42,5 +42,5 @@ func (app *application) usersPost(w http.ResponseWriter, r *http.Request) error 
 		return err
 	}
 
-	return app.writeJSON(w, http.StatusOK, envelope{"user": user}, nil)
+	return app.writeJSON(w, http.StatusCreated, envelope{"user": user}, nil)
 }

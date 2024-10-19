@@ -7,10 +7,10 @@ import (
 )
 
 var (
-	ErrRecordNotFound      = errors.New("models: no matching record found")
-	ErrInvalidCredentials  = errors.New("models: invalid credentials")
-	ErrDuplicateEmail      = errors.New("models: duplicate email")
-	ErrExpiredVerification = errors.New("models: expired verification")
+	ErrRecordNotFound     = errors.New("models: no matching record found")
+	ErrInvalidCredentials = errors.New("models: invalid credentials")
+	ErrDuplicateEmail     = errors.New("models: duplicate email")
+	ErrExpiredToken       = errors.New("models: expired token")
 )
 
 func pgErrCode(err error) string {

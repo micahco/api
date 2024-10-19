@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS authentication_token_ (
+    hash_ BYTEA PRIMARY KEY,
+    user_id_ BIGINT NOT NULL REFERENCES user_ ON DELETE CASCADE,
+    expiry_ TIMESTAMPTZ NOT NULL
+);

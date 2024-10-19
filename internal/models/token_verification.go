@@ -2,9 +2,6 @@ package models
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/base32"
 	"errors"
 	"time"
 
@@ -15,52 +12,45 @@ import (
 )
 
 // Default expiry duration
-const ttl = time.Hour * 36
+const VerificationTokenTTL = time.Hour * 36
 
 type VerificationTokenModel struct {
 	pool *pgxpool.Pool
 }
 
-type Verification struct {
-	Hash   []byte
-	Email  string
-	Expiry time.Time
+type VerificationToken struct {
+	Email string
+	*Token
 }
 
-func (v Verification) Validate() error {
-	return val.ValidateStruct(&v,
-		val.Field(&v.Hash, val.Required),
-		val.Field(&v.Email, val.Required, is.Email),
-		val.Field(&v.Expiry, val.Required))
+func (vt VerificationToken) Validate() error {
+	return val.ValidateStruct(&vt,
+		val.Field(&vt.Hash, val.Required),
+		val.Field(&vt.Email, val.Required, is.Email),
+		val.Field(&vt.Expiry, val.Required))
 }
 
-// Create and insert new verification for email. Returns the plaintext token
-func (m VerificationTokenModel) New(email string) (string, error) {
-	randomBytes := make([]byte, 16)
-	_, err := rand.Read(randomBytes)
+// Create and insert new verification for email. Generates a randomly
+// generated token and stores a hash of it in the database. Returns
+// the plaintext token.
+func (m VerificationTokenModel) New(email string) (*Token, error) {
+	t, err := generateToken(VerificationTokenTTL)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	token := base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(randomBytes)
-	// Remember: this is a byte array and must be converted into a slice [:]
-	hash := sha256.Sum256([]byte(token))
+	vt := &VerificationToken{email, t}
 
-	v := &Verification{
-		Hash:   hash[:],
-		Email:  email,
-		Expiry: time.Now().Add(ttl),
-	}
-	err = m.Insert(v)
+	err = m.Insert(vt)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return token, err
+	return t, err
 }
 
-func (m VerificationTokenModel) Insert(v *Verification) error {
-	err := v.Validate()
+func (m VerificationTokenModel) Insert(t *VerificationToken) error {
+	err := t.Validate()
 	if err != nil {
 		return err
 	}
@@ -72,7 +62,7 @@ func (m VerificationTokenModel) Insert(v *Verification) error {
 		INSERT INTO verification_token_ (hash_, email_, expiry_)
 		VALUES($1, $2, $3);`
 
-	args := []any{v.Hash, v.Email, v.Expiry}
+	args := []any{t.Hash, t.Email, t.Expiry}
 
 	_, err = m.pool.Exec(ctx, sql, args...)
 	return err
@@ -111,7 +101,7 @@ func (m VerificationTokenModel) Purge(email string) error {
 }
 
 func (m VerificationTokenModel) Verify(email, token string) error {
-	hash := sha256.Sum256([]byte(token))
+	hash := generateHash(token)
 
 	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
 	defer cancel()
@@ -122,7 +112,7 @@ func (m VerificationTokenModel) Verify(email, token string) error {
 		WHERE hash_ = $1
 		AND email_ = $2;`
 
-	args := []any{hash[:], email}
+	args := []any{hash, email}
 
 	var expiry time.Time
 	err := m.pool.QueryRow(ctx, sql, args...).Scan(&expiry)
@@ -136,7 +126,7 @@ func (m VerificationTokenModel) Verify(email, token string) error {
 	}
 
 	if time.Now().After(expiry) {
-		return ErrExpiredVerification
+		return ErrExpiredToken
 	}
 
 	return nil

@@ -20,6 +20,7 @@ func (app *application) routes() http.Handler {
 
 		r.Route("/tokens", func(r chi.Router) {
 			r.Post("/verification", app.handle(app.tokensVerificaitonPost))
+			r.Post("/authentication", app.handle(app.tokensAuthenticationPost))
 		})
 
 		r.Route("/users", func(r chi.Router) {

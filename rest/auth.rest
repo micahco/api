@@ -2,7 +2,7 @@ POST http://localhost:4000/v1/tokens/verification HTTP/1.1
 content-type: application/json
 
 {
-    "email": "johndoe@gmail.com"
+    "email": "johndoe@gmail"
 }
 
 ###
@@ -13,5 +13,15 @@ content-type: application/json
 {
     "email": "johndoe@gmail.com",
     "password": "helloworld",
-    "token": "GV562YHTIG6JJIVRDTRZKQH6HI"
+    "token": "JTAJI4G5WVVJ4T6OM5VTKYXMVE"
+}
+
+###
+
+POST http://localhost:4000/v1/tokens/authentication HTTP/1.1
+content-type: application/json
+
+{
+    "email": "johndoe@gmail.com",
+    "password": "helloworld"
 }
