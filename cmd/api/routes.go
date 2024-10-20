@@ -10,15 +10,21 @@ import (
 // App router
 func (app *application) routes() http.Handler {
 	r := chi.NewRouter()
+
+	// Middleware
+	r.Use(middleware.StripSlashes)
+	r.Use(app.metrics)
 	r.Use(app.recovery)
 	r.Use(app.enableCORS)
 	r.Use(app.rateLimit)
 	r.Use(app.authenticate)
-
-	r.Mount("/debug", middleware.Profiler())
-
 	r.NotFound(app.handle(app.notFound))
 	r.MethodNotAllowed(app.handle(app.methodNotAllowed))
+
+	// Metrics
+	r.Mount("/debug", middleware.Profiler())
+
+	// API
 	r.Route("/v1", func(r chi.Router) {
 		r.Get("/healthcheck", app.handle(app.healthcheck))
 
@@ -32,14 +38,8 @@ func (app *application) routes() http.Handler {
 
 			r.Route("/me", func(r chi.Router) {
 				r.Use(app.requireAuthentication)
-
 				r.Get("/", app.handle(app.usersMeGet))
 			})
-		})
-
-		r.Route("/resource", func(r chi.Router) {
-			r.Use(app.requireAuthentication)
-
 		})
 	})
 
