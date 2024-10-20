@@ -44,3 +44,9 @@ func (app *application) usersPost(w http.ResponseWriter, r *http.Request) error 
 
 	return app.writeJSON(w, http.StatusCreated, envelope{"user": user}, nil)
 }
+
+func (app *application) usersMeGet(w http.ResponseWriter, r *http.Request) error {
+	user := app.contextGetUser(r)
+
+	return app.writeJSON(w, http.StatusOK, envelope{"user": user}, nil)
+}

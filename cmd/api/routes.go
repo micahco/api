@@ -4,18 +4,21 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 )
 
 // App router
 func (app *application) routes() http.Handler {
 	r := chi.NewRouter()
 	r.Use(app.recovery)
+	r.Use(app.enableCORS)
 	r.Use(app.rateLimit)
 	r.Use(app.authenticate)
 
+	r.Mount("/debug", middleware.Profiler())
+
 	r.NotFound(app.handle(app.notFound))
 	r.MethodNotAllowed(app.handle(app.methodNotAllowed))
-
 	r.Route("/v1", func(r chi.Router) {
 		r.Get("/healthcheck", app.handle(app.healthcheck))
 
@@ -26,6 +29,17 @@ func (app *application) routes() http.Handler {
 
 		r.Route("/users", func(r chi.Router) {
 			r.Post("/", app.handle(app.usersPost))
+
+			r.Route("/me", func(r chi.Router) {
+				r.Use(app.requireAuthentication)
+
+				r.Get("/", app.handle(app.usersMeGet))
+			})
+		})
+
+		r.Route("/resource", func(r chi.Router) {
+			r.Use(app.requireAuthentication)
+
 		})
 	})
 

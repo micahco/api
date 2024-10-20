@@ -35,14 +35,14 @@ build:
 .PHONY: run
 run:
 	go run ./cmd/api -port=4000 -dev \
-		-url=${API_BASE_URL} \
 		-db-dsn=${DATABASE_URL} \
 		-smtp-host=${API_SMTP_HOST} \
 		-smtp-port=${API_SMTP_PORT} \
 		-smtp-username=${API_SMTP_USERNAME} \
 		-smtp-password=${API_SMTP_PASSWORD} \
 		-smtp-sender=${API_SMTP_SENDER} \
-		-limiter-enabled=false
+		-limiter-enabled=false \
+		-cors-trusted-origins=${API_CORS_TRUSTED_ORIGINS}
 
 ## db/psql: connect to the database using psql
 .PHONY: db/psql

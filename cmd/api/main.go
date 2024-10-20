@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"expvar"
 	"flag"
 	"log/slog"
 	"net/mail"
-	"net/url"
 	"os"
+	"runtime"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -36,16 +38,17 @@ type config struct {
 		password string
 		sender   string
 	}
+	cors struct {
+		trustedOrigins []string
+	}
 }
 
 func main() {
 	var cfg config
-	var urlstr string
 
 	// Default flag values for production
 	flag.IntVar(&cfg.port, "port", 8080, "API server port")
 	flag.BoolVar(&cfg.dev, "dev", false, "Development mode")
-	flag.StringVar(&urlstr, "url", "", "Base URL")
 
 	flag.StringVar(&cfg.db.dsn, "db-dsn", "", "PostgreSQL DSN")
 
@@ -59,6 +62,11 @@ func main() {
 	flag.IntVar(&cfg.limiter.burst, "limiter-burst", 4, "Rate limiter maximum burst")
 	flag.BoolVar(&cfg.limiter.enabled, "limiter-enabled", true, "Enable rate limiter")
 
+	flag.Func("cors-trusted-origins", "Trusted CORS origins (space separated)", func(val string) error {
+		cfg.cors.trustedOrigins = strings.Fields(val)
+		return nil
+	})
+
 	flag.Parse()
 
 	// Logger
@@ -66,12 +74,6 @@ func main() {
 	logger := slog.New(h)
 	// Create error log for http.Server
 	errLog := slog.NewLogLogger(h, slog.LevelError)
-
-	// Base URL
-	baseURL, err := url.Parse(urlstr)
-	if err != nil {
-		fatal(logger, err)
-	}
 
 	// PostgreSQL
 	pool, err := openPool(cfg)
@@ -99,12 +101,24 @@ func main() {
 		fatal(logger, err)
 	}
 
+	expvar.NewString("version").Set(version)
+	expvar.Publish("goroutines", expvar.Func(func() interface{} {
+		return runtime.NumGoroutine()
+	}))
+	expvar.Publish("database", expvar.Func(func() interface{} {
+		st := pool.Stat()
+		return struct {
+			MaxConns int32
+		}{
+			MaxConns: st.MaxConns(),
+		}
+	}))
+
 	app := &application{
-		baseURL: baseURL,
-		config:  cfg,
-		logger:  logger,
-		mailer:  mailer,
-		models:  data.New(pool),
+		config: cfg,
+		logger: logger,
+		mailer: mailer,
+		models: data.New(pool),
 	}
 
 	err = app.serve(errLog)

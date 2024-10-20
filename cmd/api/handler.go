@@ -14,6 +14,8 @@ import (
 const (
 	InvalidCredentailsMessage         = "invalid credentials"
 	InvalidAuthenticationTokenMessage = "invalid or missing authentication token"
+	AuthenticationRequiredMessage     = "you must be authenticated to access this resource"
+	RateLimitExceededMessage          = "rate limit exceeded"
 )
 
 type envelope map[string]any
