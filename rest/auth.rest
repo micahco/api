@@ -1,36 +1,51 @@
-GET http://localhost:4000/debug/vars HTTP/1.1
+GET http://localhost:4000/v1/healthcheck HTTP/1.1
 
-###
-
+### User signup. Requests verificaiton token.
 POST http://localhost:4000/v1/tokens/verification HTTP/1.1
 content-type: application/json
 
 {
-    "email": "johndoe@gmail.com"
+    "email": "johndoe@example.com"
 }
 
-###
-
+### Use verificaiton token to create an account
 POST http://localhost:4000/v1/users HTTP/1.1
 content-type: application/json
 
 {
-    "email": "johndoe@gmail.com",
+    "email": "johndoe@example.com",
     "password": "helloworld",
-    "token": "JTAJI4G5WVVJ4T6OM5VTKYXMVE"
+    "token": "VBODSJW6YN6YYQXJIDB3VW2ZOQ"
 }
 
-###
-
+### Request authentication token in exchange for credentials
 POST http://localhost:4000/v1/tokens/authentication HTTP/1.1
 content-type: application/json
 
 {
-    "email": "johndoe@gmail.com",
+    "email": "johndoe@example.com",
     "password": "helloworld"
 }
 
-###
-
+### Use auth token to get user information
 GET http://localhost:4000/v1/users/me HTTP/1.1
-Authorization: Bearer 2BM7SY37NWTVQDNJ4I27ROA6WA
+Authorization: Bearer PCRXVS5EE6MY7VGL677ONLECT4
+
+### Request a verification token to change email
+POST http://localhost:4000/v1/tokens/verification/user/email HTTP/1.1
+Authorization: Bearer PCRXVS5EE6MY7VGL677ONLECT4
+content-type: application/json
+
+{
+    "email": "john@domain.org"
+}
+
+### Update user with new email address
+PUT http://localhost:4000/v1/users/me HTTP/1.1
+Authorization: Bearer PCRXVS5EE6MY7VGL677ONLECT4
+content-type: application/json
+
+{
+    "email": "john@domain.org",
+    "token": "XQV53GL563POMBYTNUPMLHICRY"
+}

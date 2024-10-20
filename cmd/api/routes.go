@@ -29,8 +29,19 @@ func (app *application) routes() http.Handler {
 		r.Get("/healthcheck", app.handle(app.healthcheck))
 
 		r.Route("/tokens", func(r chi.Router) {
-			r.Post("/verification", app.handle(app.tokensVerificaitonPost))
 			r.Post("/authentication", app.handle(app.tokensAuthenticationPost))
+
+			r.Route("/verification", func(r chi.Router) {
+				r.Post("/", app.handle(app.tokensVerificaitonPost))
+				r.Post("/password", nil)
+
+				r.Route("/user", func(r chi.Router) {
+					r.Use(app.requireAuthentication)
+
+					r.Post("/email", app.handle(app.tokensVerificaitonUserEmailPost))
+					r.Post("/delete", nil)
+				})
+			})
 		})
 
 		r.Route("/users", func(r chi.Router) {
@@ -38,7 +49,9 @@ func (app *application) routes() http.Handler {
 
 			r.Route("/me", func(r chi.Router) {
 				r.Use(app.requireAuthentication)
+
 				r.Get("/", app.handle(app.usersMeGet))
+				r.Put("/", app.handle(app.usersMePut))
 			})
 		})
 	})

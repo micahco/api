@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	pgxuuid "github.com/jackc/pgx-gofrs-uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lmittmann/tint"
 	"github.com/micahco/api/internal/data"
@@ -76,7 +78,7 @@ func main() {
 	errLog := slog.NewLogLogger(h, slog.LevelError)
 
 	// PostgreSQL
-	pool, err := openPool(cfg)
+	pool, err := openPool(cfg.db.dsn)
 	if err != nil {
 		fatal(logger, err)
 	}
@@ -87,7 +89,7 @@ func main() {
 		Name:    "Do Not Reply",
 		Address: cfg.smtp.sender,
 	}
-	logger.Debug("dialing SMTP server...")
+	logger.Info("dialing SMTP server...")
 	mailer, err := mailer.New(
 		cfg.smtp.host,
 		cfg.smtp.port,
@@ -122,11 +124,20 @@ func main() {
 	}
 }
 
-func openPool(cfg config) (*pgxpool.Pool, error) {
+func openPool(dsn string) (*pgxpool.Pool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	dbpool, err := pgxpool.New(ctx, cfg.db.dsn)
+	cfg, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		return nil, err
+	}
+	cfg.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+		pgxuuid.Register(conn.TypeMap())
+		return nil
+	}
+
+	dbpool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}

@@ -5,7 +5,8 @@ import (
 	"errors"
 	"time"
 
-	val "github.com/go-ozzo/ozzo-validation"
+	validation "github.com/go-ozzo/ozzo-validation"
+	"github.com/gofrs/uuid/v5"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -18,18 +19,18 @@ type AuthenticationTokenModel struct {
 }
 
 type AuthenticationToken struct {
-	UserID int64
+	UserID uuid.UUID
 	*Token
 }
 
 func (at AuthenticationToken) Validate() error {
-	return val.ValidateStruct(&at,
-		val.Field(&at.Hash, val.Required),
-		val.Field(&at.UserID, val.Required),
-		val.Field(&at.Expiry, val.Required))
+	return validation.ValidateStruct(&at,
+		validation.Field(&at.Hash, validation.Required),
+		validation.Field(&at.Expiry, validation.Required),
+		validation.Field(&at.UserID, validation.Required))
 }
 
-func (m AuthenticationTokenModel) New(userID int64) (*Token, error) {
+func (m AuthenticationTokenModel) New(userID uuid.UUID) (*Token, error) {
 	t, err := generateToken(AuthenticationTokenTTL)
 	if err != nil {
 		return nil, err
@@ -51,22 +52,21 @@ func (m AuthenticationTokenModel) Insert(t *AuthenticationToken) error {
 		return err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
-	defer cancel()
-
 	sql := `
-		INSERT INTO authentication_token_ (hash_, user_id_, expiry_)
+		INSERT INTO authentication_token_ (hash_, expiry_, user_id_)
 		VALUES($1, $2, $3);`
 
-	args := []any{t.Hash, t.UserID, t.Expiry}
+	args := []any{t.Hash, t.Expiry, t.UserID}
+
+	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
+	defer cancel()
 
 	_, err = m.pool.Exec(ctx, sql, args...)
 	return err
 }
 
 func (m AuthenticationTokenModel) Exists(email string) (bool, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
-	defer cancel()
+	var exists bool
 
 	sql := `
 		SELECT EXISTS (
@@ -75,7 +75,9 @@ func (m AuthenticationTokenModel) Exists(email string) (bool, error) {
 			WHERE email_ = $1
 		);`
 
-	var exists bool
+	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
+	defer cancel()
+
 	err := m.pool.QueryRow(ctx, sql, email).Scan(&exists)
 	if err != nil {
 		return false, err
@@ -97,10 +99,7 @@ func (m AuthenticationTokenModel) Purge(email string) error {
 }
 
 func (m AuthenticationTokenModel) Verify(email, token string) error {
-	hash := generateHash(token)
-
-	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
-	defer cancel()
+	var expiry time.Time
 
 	sql := `
 		SELECT expiry_
@@ -108,9 +107,12 @@ func (m AuthenticationTokenModel) Verify(email, token string) error {
 		WHERE hash_ = $1
 		AND email_ = $2;`
 
+	hash := generateHash(token)
 	args := []any{hash, email}
 
-	var expiry time.Time
+	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
+	defer cancel()
+
 	err := m.pool.QueryRow(ctx, sql, args...).Scan(&expiry)
 	if err != nil {
 		switch {

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/alexedwards/argon2id"
+	"github.com/gofrs/uuid/v5"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -16,7 +17,7 @@ type UserModel struct {
 }
 
 type User struct {
-	ID           int       `json:"id"`
+	ID           uuid.UUID `json:"-"`
 	CreatedAt    time.Time `json:"created_at"`
 	Email        string    `json:"email"`
 	PasswordHash []byte    `json:"-"`
@@ -29,15 +30,28 @@ func (u *User) IsAnonymous() bool {
 	return u == AnonymousUser
 }
 
-func (m UserModel) New(email, password string) (*User, error) {
+func (u User) Validate() error {
+	return nil
+}
+
+// Generate hash from password and save to user's PasswordHash
+func (u *User) Hash(password string) error {
 	hash, err := argon2id.CreateHash(password, argon2id.DefaultParams)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	user := &User{
-		Email:        email,
-		PasswordHash: []byte(hash),
+	u.PasswordHash = []byte(hash)
+
+	return nil
+}
+
+func (m UserModel) New(email, password string) (*User, error) {
+	user := &User{Email: email}
+
+	err := user.Hash(password)
+	if err != nil {
+		return nil, err
 	}
 
 	err = m.Insert(user)
@@ -49,8 +63,10 @@ func (m UserModel) New(email, password string) (*User, error) {
 }
 
 func (m UserModel) Insert(user *User) error {
-	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
-	defer cancel()
+	err := user.Validate()
+	if err != nil {
+		return err
+	}
 
 	sql := `
 		INSERT INTO user_ (email_, password_hash_)
@@ -59,7 +75,10 @@ func (m UserModel) Insert(user *User) error {
 
 	args := []any{user.Email, user.PasswordHash}
 
-	err := m.pool.QueryRow(ctx, sql, args...).Scan(&user.ID, &user.CreatedAt, &user.Version)
+	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
+	defer cancel()
+
+	err = m.pool.QueryRow(ctx, sql, args...).Scan(&user.ID, &user.CreatedAt, &user.Version)
 	if err != nil {
 		switch {
 		case pgErrCode(err) == pgerrcode.UniqueViolation:
@@ -73,14 +92,15 @@ func (m UserModel) Insert(user *User) error {
 }
 
 func (m UserModel) GetForCredentials(email, password string) (*User, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
-	defer cancel()
+	var u User
 
 	sql := `
 		SELECT id_, created_at_, email_, password_hash_, version_
 		FROM user_ WHERE email_ = $1;`
 
-	var u User
+	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
+	defer cancel()
+
 	err := m.pool.QueryRow(ctx, sql, email).Scan(
 		&u.ID,
 		&u.CreatedAt,
@@ -109,10 +129,8 @@ func (m UserModel) GetForCredentials(email, password string) (*User, error) {
 }
 
 func (m UserModel) GetForAuthToken(token string) (*User, error) {
-	hash := generateHash(token)
-
-	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
-	defer cancel()
+	var u User
+	var expiry time.Time
 
 	sql := `
 		SELECT user_.id_, user_.created_at_, user_.email_, user_.password_hash_, 
@@ -122,8 +140,11 @@ func (m UserModel) GetForAuthToken(token string) (*User, error) {
 		ON user_.id_ = authentication_token_.user_id_
 		WHERE authentication_token_.hash_ = $1;`
 
-	var u User
-	var expiry time.Time
+	hash := generateHash(token)
+
+	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
+	defer cancel()
+
 	err := m.pool.QueryRow(ctx, sql, hash).Scan(
 		&u.ID,
 		&u.CreatedAt,
@@ -148,9 +169,8 @@ func (m UserModel) GetForAuthToken(token string) (*User, error) {
 	return &u, nil
 }
 
-func (m UserModel) Exists(email string) (bool, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
-	defer cancel()
+func (m UserModel) ExistsWithEmail(email string) (bool, error) {
+	var exists bool
 
 	sql := `
 		SELECT EXISTS (
@@ -159,7 +179,9 @@ func (m UserModel) Exists(email string) (bool, error) {
 			WHERE email_ = $1
 		);`
 
-	var exists bool
+	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
+	defer cancel()
+
 	err := m.pool.QueryRow(ctx, sql, email).Scan(&exists)
 	if err != nil {
 		return false, err
@@ -169,14 +191,16 @@ func (m UserModel) Exists(email string) (bool, error) {
 }
 
 func (m UserModel) Update(user *User) error {
-	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
-	defer cancel()
+	err := user.Validate()
+	if err != nil {
+		return err
+	}
 
 	sql := `
-		UPDATE users 
+		UPDATE user_ 
         SET email_ = $1, password_hash_ = $2, version_ = version_ + 1
         WHERE id_ = $3 AND version_ = $4
-        RETURNING version`
+        RETURNING version_`
 
 	args := []any{
 		user.Email,
@@ -185,9 +209,14 @@ func (m UserModel) Update(user *User) error {
 		user.Version,
 	}
 
-	err := m.pool.QueryRow(ctx, sql, args...).Scan(&user.Version)
+	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
+	defer cancel()
+
+	err = m.pool.QueryRow(ctx, sql, args...).Scan(&user.Version)
 	if err != nil {
 		switch {
+		case errors.Is(err, pgx.ErrNoRows):
+			return ErrEditConflict
 		case pgErrCode(err) == pgerrcode.UniqueViolation:
 			return ErrDuplicateEmail
 		default:
