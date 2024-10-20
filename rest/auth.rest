@@ -2,7 +2,7 @@ POST http://localhost:4000/v1/tokens/verification HTTP/1.1
 content-type: application/json
 
 {
-    "email": "johndoe@gmail"
+    "email": "johndoe@gmail.com"
 }
 
 ###
@@ -25,3 +25,8 @@ content-type: application/json
     "email": "johndoe@gmail.com",
     "password": "helloworld"
 }
+
+###
+
+GET http://localhost:4000/v1/healthcheck HTTP/1.1
+Authorization: Bearer N45Z6SD2PY6R37YQSANZJOJSFQ

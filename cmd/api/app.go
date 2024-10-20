@@ -5,8 +5,8 @@ import (
 	"net/url"
 	"sync"
 
+	"github.com/micahco/api/internal/data"
 	"github.com/micahco/api/internal/mailer"
-	"github.com/micahco/api/internal/models"
 )
 
 type application struct {
@@ -14,7 +14,7 @@ type application struct {
 	config  config
 	logger  *slog.Logger
 	mailer  *mailer.Mailer
-	models  models.Models
+	models  data.Models
 	wg      sync.WaitGroup
 }
 

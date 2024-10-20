@@ -11,8 +11,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lmittmann/tint"
+	"github.com/micahco/api/internal/data"
 	"github.com/micahco/api/internal/mailer"
-	"github.com/micahco/api/internal/models"
 	"github.com/micahco/api/ui"
 )
 
@@ -104,7 +104,7 @@ func main() {
 		config:  cfg,
 		logger:  logger,
 		mailer:  mailer,
-		models:  models.New(pool),
+		models:  data.New(pool),
 	}
 
 	err = app.serve(errLog)

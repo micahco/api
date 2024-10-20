@@ -12,7 +12,8 @@ import (
 )
 
 const (
-	InvalidCredentailsMessage = "invalid credentials"
+	InvalidCredentailsMessage         = "invalid credentials"
+	InvalidAuthenticationTokenMessage = "invalid or missing authentication token"
 )
 
 type envelope map[string]any
@@ -23,10 +24,10 @@ type withError func(w http.ResponseWriter, r *http.Request) error
 func (app *application) handle(h withError) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := h(w, r); err != nil {
-			var es validation.Errors
+			var validationError validation.Errors
 			switch {
-			case errors.As(err, &es):
-				app.errorResponse(w, http.StatusUnprocessableEntity, es)
+			case errors.As(err, &validationError):
+				app.errorResponse(w, http.StatusUnprocessableEntity, validationError)
 			default:
 				app.serverErrorResponse(w, "handled unexpected error", err)
 			}
@@ -39,8 +40,6 @@ func (app *application) readJSON(r *http.Request, dst any) error {
 		var syntaxError *json.SyntaxError
 		var unmarshalTypeError *json.UnmarshalTypeError
 		var invalidUnmarshalError *json.InvalidUnmarshalError
-
-		// TODO: return response errors for user
 		switch {
 		case errors.As(err, &syntaxError):
 			return fmt.Errorf("body contains badly-formed JSON (at character %d)", syntaxError.Offset)
@@ -115,4 +114,10 @@ func (app *application) serverErrorResponse(w http.ResponseWriter, logMsg string
 	app.logger.Error(logMsg, slog.Any("err", err), slog.String("type", fmt.Sprintf("%T", err)))
 
 	app.errorResponse(w, http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError))
+}
+
+func (app *application) invalidAuthenticationTokenResponse(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("WWW-Authenticate", "Bearer")
+
+	app.errorResponse(w, http.StatusUnauthorized, InvalidAuthenticationTokenMessage)
 }

@@ -1,4 +1,4 @@
-package models
+package data
 
 import (
 	"context"
@@ -21,6 +21,12 @@ type User struct {
 	Email        string    `json:"email"`
 	PasswordHash []byte    `json:"-"`
 	Version      int       `json:"-"`
+}
+
+var AnonymousUser = &User{}
+
+func (u *User) IsAnonymous() bool {
+	return u == AnonymousUser
 }
 
 func (m UserModel) New(email, password string) (*User, error) {
@@ -64,6 +70,82 @@ func (m UserModel) Insert(user *User) error {
 	}
 
 	return nil
+}
+
+func (m UserModel) GetForCredentials(email, password string) (*User, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
+	defer cancel()
+
+	sql := `
+		SELECT id_, created_at_, email_, password_hash_, version_
+		FROM user_ WHERE email_ = $1;`
+
+	var u User
+	err := m.pool.QueryRow(ctx, sql, email).Scan(
+		&u.ID,
+		&u.CreatedAt,
+		&u.Email,
+		&u.PasswordHash,
+		&u.Version,
+	)
+	if err != nil {
+		switch {
+		case errors.Is(err, pgx.ErrNoRows):
+			return nil, ErrInvalidCredentials
+		default:
+			return nil, err
+		}
+	}
+
+	match, err := argon2id.ComparePasswordAndHash(password, string(u.PasswordHash))
+	if err != nil {
+		return nil, err
+	}
+	if !match {
+		return nil, ErrInvalidCredentials
+	}
+
+	return &u, nil
+}
+
+func (m UserModel) GetForAuthToken(token string) (*User, error) {
+	hash := generateHash(token)
+
+	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
+	defer cancel()
+
+	sql := `
+		SELECT user_.id_, user_.created_at_, user_.email_, user_.password_hash_, 
+		user_.version_, authentication_token_.expiry_
+		FROM user_
+		INNER JOIN authentication_token_
+		ON user_.id_ = authentication_token_.user_id_
+		WHERE authentication_token_.hash_ = $1;`
+
+	var u User
+	var expiry time.Time
+	err := m.pool.QueryRow(ctx, sql, hash).Scan(
+		&u.ID,
+		&u.CreatedAt,
+		&u.Email,
+		&u.PasswordHash,
+		&u.Version,
+		&expiry,
+	)
+	if err != nil {
+		switch {
+		case errors.Is(err, pgx.ErrNoRows):
+			return nil, ErrRecordNotFound
+		default:
+			return nil, err
+		}
+	}
+
+	if time.Now().After(expiry) {
+		return nil, ErrExpiredToken
+	}
+
+	return &u, nil
 }
 
 func (m UserModel) Exists(email string) (bool, error) {
@@ -114,34 +196,4 @@ func (m UserModel) Update(user *User) error {
 	}
 
 	return nil
-}
-
-func (m UserModel) Authenticate(email, password string) (int, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
-	defer cancel()
-
-	sql := `
-		SELECT id_, password_hash_
-		FROM user_ WHERE email_ = $1;`
-
-	var user User
-	err := m.pool.QueryRow(ctx, sql, email).Scan(&user.ID, &user.PasswordHash)
-	if err != nil {
-		switch {
-		case errors.Is(err, pgx.ErrNoRows):
-			return 0, ErrInvalidCredentials
-		default:
-			return 0, err
-		}
-	}
-
-	match, err := argon2id.ComparePasswordAndHash(password, string(user.PasswordHash))
-	if err != nil {
-		return 0, err
-	}
-	if !match {
-		return 0, ErrInvalidCredentials
-	}
-
-	return user.ID, nil
 }

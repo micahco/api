@@ -3,7 +3,7 @@ package main
 import (
 	"net/http"
 
-	"github.com/micahco/api/internal/models"
+	"github.com/micahco/api/internal/data"
 )
 
 // Create a verification token and mail it to the user's email.
@@ -76,16 +76,16 @@ func (app *application) tokensAuthenticationPost(w http.ResponseWriter, r *http.
 		return err
 	}
 
-	userID, err := app.models.User.Authenticate(input.Email, input.Password)
+	user, err := app.models.User.GetForCredentials(input.Email, input.Password)
 	if err != nil {
-		if err == models.ErrInvalidCredentials {
+		if err == data.ErrInvalidCredentials {
 			return app.writeError(w, http.StatusUnauthorized, InvalidCredentailsMessage)
 		}
 
 		return err
 	}
 
-	t, err := app.models.AuthenticationToken.New(int64(userID))
+	t, err := app.models.AuthenticationToken.New(int64(user.ID))
 	if err != nil {
 		return err
 	}

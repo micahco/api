@@ -11,6 +11,7 @@ func (app *application) routes() http.Handler {
 	r := chi.NewRouter()
 	r.Use(app.recovery)
 	r.Use(app.rateLimit)
+	r.Use(app.authenticate)
 
 	r.NotFound(app.handle(app.notFound))
 	r.MethodNotAllowed(app.handle(app.methodNotAllowed))

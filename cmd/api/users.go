@@ -3,7 +3,7 @@ package main
 import (
 	"net/http"
 
-	"github.com/micahco/api/internal/models"
+	"github.com/micahco/api/internal/data"
 )
 
 // Create new user with email and password if provided token
@@ -23,9 +23,9 @@ func (app *application) usersPost(w http.ResponseWriter, r *http.Request) error 
 	err = app.models.VerificationToken.Verify(input.Email, input.Token)
 	if err != nil {
 		switch err {
-		case models.ErrRecordNotFound:
+		case data.ErrRecordNotFound:
 			return app.writeError(w, http.StatusUnauthorized, nil)
-		case models.ErrExpiredToken:
+		case data.ErrExpiredToken:
 			return app.writeError(w, http.StatusUnauthorized, "Expired token. Please signup again.")
 		default:
 			return err
