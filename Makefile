@@ -26,10 +26,14 @@ audit:
 	go test -race -vet=off ./...
 	
 ## build: build the cmd/api application
+current_time = $(shell date --iso-8601=seconds)
+git_description = $(shell git describe --always --dirty --tags --long;)
+linker_flags = '-s -X main.buildTime=${current_time} -X main.version=${git_description}'
+
 .PHONY: build
 build:
 	@echo "Building cmd/api..."
-	go build -ldflags="-s" -o=./bin/api ./cmd/api
+	go build -ldflags=${linker_flags} -o=./bin/api ./cmd/api
 
 ## run: run the cmd/api application
 .PHONY: run
@@ -63,6 +67,6 @@ db/migrations/up: confirm
 
 ## db/migrations/drop: drop the entire databse schema
 .PHONY: db/migrations/drop
-db/migrations/drop: confirm
+db/migrations/drop:
 	@echo "Dropping the entire database schema..."
 	migrate -path ./migrations -database ${DATABASE_URL} drop

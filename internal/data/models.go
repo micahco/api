@@ -4,6 +4,7 @@ import (
 	"errors"
 	"time"
 
+	validation "github.com/go-ozzo/ozzo-validation"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -24,6 +25,12 @@ func New(pool *pgxpool.Pool) Models {
 	}
 }
 
+// Validation rules
+var (
+	PasswordLength = validation.Length(8, 72)
+)
+
+// Sentinel models errors
 var (
 	ErrRecordNotFound     = errors.New("models: no matching record found")
 	ErrInvalidCredentials = errors.New("models: invalid credentials")

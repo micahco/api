@@ -1,7 +1,7 @@
 GET http://localhost:4000/v1/healthcheck HTTP/1.1
 
 ### User signup. Requests verificaiton token.
-POST http://localhost:4000/v1/tokens/verification HTTP/1.1
+POST http://localhost:4000/v1/tokens/verification/registration HTTP/1.1
 content-type: application/json
 
 {
@@ -15,7 +15,7 @@ content-type: application/json
 {
     "email": "johndoe@example.com",
     "password": "helloworld",
-    "token": "VBODSJW6YN6YYQXJIDB3VW2ZOQ"
+    "token": "5MQAEU6LA3BVJCGGA5TG2IVZNE"
 }
 
 ### Request authentication token in exchange for credentials
@@ -29,23 +29,32 @@ content-type: application/json
 
 ### Use auth token to get user information
 GET http://localhost:4000/v1/users/me HTTP/1.1
-Authorization: Bearer PCRXVS5EE6MY7VGL677ONLECT4
+Authorization: Bearer GG7LRX4HWNCT5PW5VKTPKW26DQ
 
 ### Request a verification token to change email
-POST http://localhost:4000/v1/tokens/verification/user/email HTTP/1.1
-Authorization: Bearer PCRXVS5EE6MY7VGL677ONLECT4
+POST http://localhost:4000/v1/tokens/verification/email-change HTTP/1.1
+Authorization: Bearer GG7LRX4HWNCT5PW5VKTPKW26DQ
 content-type: application/json
 
 {
-    "email": "john@domain.org"
+    "email": "dames@domain.org"
 }
 
 ### Update user with new email address
 PUT http://localhost:4000/v1/users/me HTTP/1.1
-Authorization: Bearer PCRXVS5EE6MY7VGL677ONLECT4
+Authorization: Bearer GG7LRX4HWNCT5PW5VKTPKW26DQ
 content-type: application/json
 
 {
-    "email": "john@domain.org",
-    "token": "XQV53GL563POMBYTNUPMLHICRY"
+    "email": "dames@domain.org",
+    "token": "PBKD6WANZYM6OBVIW6D4ZN5ZHM"
+}
+
+### Request a password reset
+POST http://localhost:4000/v1/tokens/verification/email-change HTTP/1.1
+Authorization: Bearer GG7LRX4HWNCT5PW5VKTPKW26DQ
+content-type: application/json
+
+{
+    "email": "dames@domain.org"
 }

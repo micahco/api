@@ -3,6 +3,8 @@ package main
 import (
 	"net/http"
 
+	validation "github.com/go-ozzo/ozzo-validation"
+	"github.com/go-ozzo/ozzo-validation/is"
 	"github.com/micahco/api/internal/data"
 )
 
@@ -16,6 +18,15 @@ func (app *application) usersPost(w http.ResponseWriter, r *http.Request) error 
 	}
 
 	err := app.readJSON(r, &input)
+	if err != nil {
+		return err
+	}
+
+	err = validation.ValidateStruct(&input,
+		validation.Field(&input.Email, validation.Required, is.Email),
+		validation.Field(&input.Password, validation.Required, data.PasswordLength),
+		validation.Field(&input.Token, validation.Required),
+	)
 	if err != nil {
 		return err
 	}
@@ -45,6 +56,56 @@ func (app *application) usersPost(w http.ResponseWriter, r *http.Request) error 
 	return app.writeJSON(w, http.StatusCreated, envelope{"user": user}, nil)
 }
 
+func (app *application) usersPasswordPut(w http.ResponseWriter, r *http.Request) error {
+	var input struct {
+		Password string `json:"password"`
+		Token    string `json:"token"`
+	}
+
+	err := app.readJSON(r, &input)
+	if err != nil {
+		return err
+	}
+
+	err = validation.ValidateStruct(&input,
+		validation.Field(&input.Password, validation.Required, data.PasswordLength),
+		validation.Field(&input.Token, validation.Required),
+	)
+	if err != nil {
+		return err
+	}
+
+	user, err := app.models.User.GetForVerificationToken(data.ScopePasswordReset, input.Token)
+	if err != nil {
+		switch {
+		default:
+			return err
+		}
+	}
+
+	err = user.SetPasswordHash(input.Password)
+	if err != nil {
+		return err
+	}
+
+	err = app.models.User.Update(user)
+	if err != nil {
+		switch {
+		default:
+			return err
+		}
+	}
+
+	err = app.models.VerificationToken.PurgeWithUserID(user.ID)
+	if err != nil {
+		return err
+	}
+
+	msg := envelope{"message": "your password was successfully reset"}
+
+	return app.writeJSON(w, http.StatusOK, msg, nil)
+}
+
 func (app *application) usersMeGet(w http.ResponseWriter, r *http.Request) error {
 	user := app.contextGetUser(r)
 
@@ -63,11 +124,19 @@ func (app *application) usersMePut(w http.ResponseWriter, r *http.Request) error
 		return err
 	}
 
+	err = validation.ValidateStruct(&input,
+		validation.Field(&input.Email, is.Email),
+		validation.Field(&input.Password, data.PasswordLength),
+		validation.Field(&input.Token),
+	)
+	if err != nil {
+		return err
+	}
+
 	user := app.contextGetUser(r)
 
 	if input.Email != nil && input.Token != nil {
-		// Verify new email
-		err = app.models.VerificationToken.Verify(*input.Token, data.ScopeChangeEmail, *input.Email, &user.ID)
+		err = app.models.VerificationToken.Verify(*input.Token, data.ScopeEmailChange, *input.Email, &user.ID)
 		if err != nil {
 			switch err {
 			case data.ErrRecordNotFound:
@@ -88,7 +157,7 @@ func (app *application) usersMePut(w http.ResponseWriter, r *http.Request) error
 	}
 
 	if input.Password != nil {
-		err = user.Hash(*input.Password)
+		err = user.SetPasswordHash(*input.Password)
 		if err != nil {
 			return err
 		}

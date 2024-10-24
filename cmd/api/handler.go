@@ -13,7 +13,7 @@ import (
 
 const (
 	InvalidCredentailsMessage         = "invalid credentials"
-	InvalidAuthenticationTokenMessage = "invalid or missing authentication token"
+	InvalidAuthenticationTokenMessage = "invalid or expired authentication token"
 	AuthenticationRequiredMessage     = "you must be authenticated to access this resource"
 	RateLimitExceededMessage          = "rate limit exceeded"
 )
@@ -118,7 +118,7 @@ func (app *application) serverErrorResponse(w http.ResponseWriter, logMsg string
 	app.errorResponse(w, http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError))
 }
 
-func (app *application) invalidAuthenticationTokenResponse(w http.ResponseWriter, r *http.Request) {
+func (app *application) invalidAuthenticationTokenResponse(w http.ResponseWriter) {
 	w.Header().Set("WWW-Authenticate", "Bearer")
 
 	app.errorResponse(w, http.StatusUnauthorized, InvalidAuthenticationTokenMessage)

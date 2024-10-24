@@ -95,3 +95,13 @@ func (app *application) background(fn func() error) {
 		}
 	}()
 }
+
+func (app *application) sendMail(recepient string, tmpl string, data map[string]any) error {
+	if app.config.dev {
+		app.logger.Debug("mail to "+recepient, slog.Any("data", data))
+
+		return nil
+	}
+
+	return app.mailer.Send(recepient, tmpl, data)
+}

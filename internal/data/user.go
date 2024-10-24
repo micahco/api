@@ -34,8 +34,7 @@ func (u User) Validate() error {
 	return nil
 }
 
-// Generate hash from password and save to user's PasswordHash
-func (u *User) Hash(password string) error {
+func (u *User) SetPasswordHash(password string) error {
 	hash, err := argon2id.CreateHash(password, argon2id.DefaultParams)
 	if err != nil {
 		return err
@@ -49,7 +48,7 @@ func (u *User) Hash(password string) error {
 func (m UserModel) New(email, password string) (*User, error) {
 	user := &User{Email: email}
 
-	err := user.Hash(password)
+	err := user.SetPasswordHash(password)
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +127,7 @@ func (m UserModel) GetForCredentials(email, password string) (*User, error) {
 	return &u, nil
 }
 
-func (m UserModel) GetForAuthToken(token string) (*User, error) {
+func (m UserModel) GetForAuthenticationToken(token string) (*User, error) {
 	var u User
 	var expiry time.Time
 
@@ -146,6 +145,49 @@ func (m UserModel) GetForAuthToken(token string) (*User, error) {
 	defer cancel()
 
 	err := m.pool.QueryRow(ctx, sql, hash).Scan(
+		&u.ID,
+		&u.CreatedAt,
+		&u.Email,
+		&u.PasswordHash,
+		&u.Version,
+		&expiry,
+	)
+	if err != nil {
+		switch {
+		case errors.Is(err, pgx.ErrNoRows):
+			return nil, ErrRecordNotFound
+		default:
+			return nil, err
+		}
+	}
+
+	if time.Now().After(expiry) {
+		return nil, ErrExpiredToken
+	}
+
+	return &u, nil
+}
+
+func (m UserModel) GetForVerificationToken(scope, token string) (*User, error) {
+	var u User
+	var expiry time.Time
+
+	sql := `
+		SELECT user_.id_, user_.created_at_, user_.email_, user_.password_hash_, 
+		user_.version_, verification_token_.expiry_
+		FROM user_
+		INNER JOIN verification_token_
+		ON user_.id_ = verification_token_.user_id_
+		WHERE verification_token_.scope_ = $1
+		AND verification_token_.hash_ = $2;`
+
+	hash := generateHash(token)
+	args := []any{scope, hash}
+
+	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
+	defer cancel()
+
+	err := m.pool.QueryRow(ctx, sql, args...).Scan(
 		&u.ID,
 		&u.CreatedAt,
 		&u.Email,

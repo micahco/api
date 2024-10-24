@@ -32,20 +32,20 @@ func (app *application) routes() http.Handler {
 			r.Post("/authentication", app.handle(app.tokensAuthenticationPost))
 
 			r.Route("/verification", func(r chi.Router) {
-				r.Post("/", app.handle(app.tokensVerificaitonPost))
-				r.Post("/password", nil)
+				r.Post("/registration", app.handle(app.tokensVerificaitonRegistrationPost))
+				r.Post("/password-reset", app.handle(app.tokensVerificaitonPasswordResetPost))
 
-				r.Route("/user", func(r chi.Router) {
+				r.Route("/email-change", func(r chi.Router) {
 					r.Use(app.requireAuthentication)
 
-					r.Post("/email", app.handle(app.tokensVerificaitonUserEmailPost))
-					r.Post("/delete", nil)
+					r.Post("/", app.handle(app.tokensVerificaitonEmailChangePost))
 				})
 			})
 		})
 
 		r.Route("/users", func(r chi.Router) {
 			r.Post("/", app.handle(app.usersPost))
+			r.Put("/password", app.handle(app.usersPasswordPut))
 
 			r.Route("/me", func(r chi.Router) {
 				r.Use(app.requireAuthentication)

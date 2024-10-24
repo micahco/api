@@ -4,13 +4,13 @@ import (
 	"errors"
 	"expvar"
 	"fmt"
-	"net"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/micahco/api/internal/data"
+	"github.com/tomasen/realip"
 	"golang.org/x/time/rate"
 )
 
@@ -105,13 +105,7 @@ func (app *application) rateLimit(next http.Handler) http.Handler {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if app.config.limiter.enabled {
-			// Extract the client's IP address from the request.
-			ip, _, err := net.SplitHostPort(r.RemoteAddr)
-			if err != nil {
-				app.serverErrorResponse(w, "middleware: rateLimit: extract client ip", err)
-
-				return
-			}
+			ip := realip.FromRequest(r)
 
 			// Lock the mutex to prevent this code from being executed concurrently.
 			mu.Lock()
@@ -157,19 +151,20 @@ func (app *application) authenticate(next http.Handler) http.Handler {
 
 		headerParts := strings.Split(authorizationHeader, " ")
 		if len(headerParts) != 2 || headerParts[0] != "Bearer" {
-			app.invalidAuthenticationTokenResponse(w, r)
+			app.invalidAuthenticationTokenResponse(w)
 			return
 		}
 
 		token := headerParts[1]
 
-		user, err := app.models.User.GetForAuthToken(token)
+		user, err := app.models.User.GetForAuthenticationToken(token)
 		if err != nil {
 			switch {
-			case errors.Is(err, data.ErrRecordNotFound):
-				app.invalidAuthenticationTokenResponse(w, r)
+			case errors.Is(err, data.ErrRecordNotFound),
+				errors.Is(err, data.ErrExpiredToken):
+				app.invalidAuthenticationTokenResponse(w)
 			default:
-				app.serverErrorResponse(w, "middleware: authenticate: GetForAuthToken", err)
+				app.serverErrorResponse(w, "middleware: authenticate: GetForAuthenticationToken", err)
 			}
 			return
 		}

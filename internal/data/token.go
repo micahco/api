@@ -7,6 +7,8 @@ import (
 	"time"
 )
 
+const TokenSize = 16
+
 type Token struct {
 	Plaintext string    `json:"token"`
 	Hash      []byte    `json:"-"`
@@ -14,7 +16,7 @@ type Token struct {
 }
 
 func generateToken(ttl time.Duration) (*Token, error) {
-	randomBytes := make([]byte, 16)
+	randomBytes := make([]byte, TokenSize)
 	_, err := rand.Read(randomBytes)
 	if err != nil {
 		return nil, err

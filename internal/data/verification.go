@@ -15,9 +15,9 @@ import (
 const (
 	VerificationTokenTTL = time.Hour * 36
 	ScopeRegistration    = "registration"
-	ScopeChangeEmail     = "change_email"
-	ScopeResetPassword   = "reset_password"
-	ScopeAccountDeletion = "account_deletion"
+	ScopeAccountDeletion = "account-deletion"
+	ScopeEmailChange     = "email-change"
+	ScopePasswordReset   = "password-reset"
 )
 
 type VerificationTokenModel struct {
