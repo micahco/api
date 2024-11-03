@@ -15,7 +15,7 @@ content-type: application/json
 {
     "email": "johndoe@example.com",
     "password": "helloworld",
-    "token": "5MQAEU6LA3BVJCGGA5TG2IVZNE"
+    "token": "BV5FCUSQYBD5DE2XFGCWP72MSI"
 }
 
 ### Request authentication token in exchange for credentials
@@ -29,11 +29,11 @@ content-type: application/json
 
 ### Use auth token to get user information
 GET http://localhost:4000/v1/users/me HTTP/1.1
-Authorization: Bearer GG7LRX4HWNCT5PW5VKTPKW26DQ
+Authorization: Bearer MBPIW4MBKBUM57RPEMOJ6I27JE
 
 ### Request a verification token to change email
 POST http://localhost:4000/v1/tokens/verification/email-change HTTP/1.1
-Authorization: Bearer GG7LRX4HWNCT5PW5VKTPKW26DQ
+Authorization: Bearer MBPIW4MBKBUM57RPEMOJ6I27JE
 content-type: application/json
 
 {
@@ -42,7 +42,7 @@ content-type: application/json
 
 ### Update user with new email address
 PUT http://localhost:4000/v1/users/me HTTP/1.1
-Authorization: Bearer GG7LRX4HWNCT5PW5VKTPKW26DQ
+Authorization: Bearer MBPIW4MBKBUM57RPEMOJ6I27JE
 content-type: application/json
 
 {
@@ -52,7 +52,7 @@ content-type: application/json
 
 ### Request a password reset
 POST http://localhost:4000/v1/tokens/verification/email-change HTTP/1.1
-Authorization: Bearer GG7LRX4HWNCT5PW5VKTPKW26DQ
+Authorization: Bearer MBPIW4MBKBUM57RPEMOJ6I27JE
 content-type: application/json
 
 {

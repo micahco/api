@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/alexedwards/argon2id"
+	validation "github.com/go-ozzo/ozzo-validation"
+	"github.com/go-ozzo/ozzo-validation/is"
 	"github.com/gofrs/uuid/v5"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
@@ -31,7 +33,9 @@ func (u *User) IsAnonymous() bool {
 }
 
 func (u User) Validate() error {
-	return nil
+	return validation.ValidateStruct(&u,
+		validation.Field(&u.Email, validation.Required, is.Email),
+		validation.Field(&u.PasswordHash, validation.Required))
 }
 
 func (u *User) SetPasswordHash(password string) error {
