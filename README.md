@@ -5,9 +5,12 @@ A barebones REST API template with basic email authentication flow.
 ## Development
 
 ```
+touch .envrc.secrets
 cp .envrc.sample .envrc
 direnv allow
-make audit
+
+# list of commands
+make
 ```
 
 ## Resources

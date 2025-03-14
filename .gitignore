@@ -3,5 +3,6 @@ bin/
 ui/static/main.css
 
 .env
-.envrc
+.envrc*
+!.envrc.local
 .direnv
