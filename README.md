@@ -2,6 +2,14 @@
 
 A barebones REST API template with basic email authentication flow.
 
+## Development
+
+```
+cp .envrc.sample .envrc
+direnv allow
+make audit
+```
+
 ## Resources
 
 * [lets-go.alexedwards.net](https://lets-go.alexedwards.net)

@@ -2,6 +2,6 @@ bin/
 
 ui/static/main.css
 
-.envrc
 .env
-!.devcontainer/.env
+.envrc
+.direnv
