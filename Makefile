@@ -47,16 +47,16 @@ db/psql:
 .PHONY: db/migrations/new
 db/migrations/new:
 	@echo "Creating migration files for ${label}..."
-	go tool migrate create -seq -ext=.sql -dir=./migrations ${label}
+	go tool goose -s create ${label} sql
 
 ## db/migrations/up: apply all up database migrations
 .PHONY: db/migrations/up
 db/migrations/up: confirm
 	@echo "Running up migrations..."
-	go tool migrate -path ./migrations -database ${DATABASE_URL} up
+	go tool goose up
 
-## db/migrations/drop: drop the entire databse schema
-.PHONY: db/migrations/drop
-db/migrations/drop:
+## db/migrations/reset: drop the entire databse schema
+.PHONY: db/migrations/reset
+db/migrations/reset:
 	@echo "Dropping the entire database schema..."
-	go tool migrate -path ./migrations -database ${DATABASE_URL} drop
+	go tool goose -s down-to 0
