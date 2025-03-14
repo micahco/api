@@ -41,8 +41,8 @@ type config struct {
 		enabled bool
 	}
 	smtp struct {
-		host     string
 		port     int
+		host     string
 		username string
 		password string
 		sender   string
@@ -60,10 +60,10 @@ func main() {
 
 	flag.StringVar(&cfg.db.dsn, "db-dsn", os.Getenv("DATABASE_URL"), "PostgreSQL DSN")
 
-	flag.StringVar(&cfg.smtp.host, "smtp-host", os.Getenv("API_SMTP_HOST"), "SMTP host")
-	flag.IntVar(&cfg.smtp.port, "smtp-port", getEnvInt("API_SMTP_PORT"), "SMTP port")
-	flag.StringVar(&cfg.smtp.username, "smtp-username", os.Getenv("API_SMTP_USERNAME"), "SMTP username")
-	flag.StringVar(&cfg.smtp.password, "smtp-password", os.Getenv("API_SMTP_PASSWORD"), "SMTP password")
+	flag.IntVar(&cfg.smtp.port, "smtp-port", getEnvInt("SMTP_PORT"), "SMTP port")
+	flag.StringVar(&cfg.smtp.host, "smtp-host", os.Getenv("SMTP_HOST"), "SMTP host")
+	flag.StringVar(&cfg.smtp.username, "smtp-username", os.Getenv("SMTP_USERNAME"), "SMTP username")
+	flag.StringVar(&cfg.smtp.password, "smtp-password", os.Getenv("SMTP_PASSWORD"), "SMTP password")
 	flag.StringVar(&cfg.smtp.sender, "smtp-sender", os.Getenv("API_SMTP_SENDER"), "SMTP sender")
 
 	flag.BoolVar(&cfg.limiter.enabled, "limiter-enabled", getEnvBool("API_LIMITER_ENABLED"), "Enable rate limiter")

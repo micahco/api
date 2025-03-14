@@ -1,9 +1,2 @@
 use flake
 source_env .envrc.local
-
-# secrets
-export API_SMTP_HOST=""
-export API_SMTP_PORT=2525
-export API_SMTP_USERNAME=""
-export API_SMTP_PASSWORD=""
-export API_SMTP_SENDER="no-reply@cowell.dev"

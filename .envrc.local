@@ -1,5 +1,12 @@
 export DATABASE_URL="postgresql://postgres:password@localhost:5432/postgres?sslmode=disable"
+export POSTGRES_PASSWORD="password"
+export POSTGRES_PORT=5432
+export SMTP_PORT=2525
+export SMTP_WEB_PORT=4025
+export SMTP_HOST="localhost"
+export API_PORT=4000
 export API_LIMITER_ENABLED=false
 export API_LIMITER_RPS=2
 export API_LIMITER_BURST=4
+export API_SMTP_SENDER="no-reply@cowell.dev"
 export API_CORS_TRUSTED_ORIGINS="http://localhost:9000 http://localhost:9001"

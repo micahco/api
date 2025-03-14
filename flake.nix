@@ -29,7 +29,13 @@
           # The Nix packages provided in the environment
           packages = with pkgs; [
             go # The Go CLI
-            gotools # Go tools like goimports, godoc, and others
+            gotools # Go tools for vscode
+            gopls
+            go-outline
+            gopkgs
+            gocode-gomod
+            godef
+            golint
             postgresql # psql
           ];
         };
