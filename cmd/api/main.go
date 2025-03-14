@@ -5,10 +5,12 @@ import (
 	"expvar"
 	"flag"
 	"fmt"
+	"log"
 	"log/slog"
 	"net/mail"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -24,6 +26,7 @@ import (
 var (
 	buildTime string
 	version   string
+	logger    *slog.Logger
 )
 
 type config struct {
@@ -33,7 +36,7 @@ type config struct {
 		dsn string
 	}
 	limiter struct {
-		rps     float64
+		rps     int
 		burst   int
 		enabled bool
 	}
@@ -52,23 +55,26 @@ type config struct {
 func main() {
 	var cfg config
 
-	// Default flag values for production
-	flag.IntVar(&cfg.port, "port", 8080, "API server port")
 	flag.BoolVar(&cfg.dev, "dev", false, "Development mode")
+	flag.IntVar(&cfg.port, "port", getEnvInt("API_PORT"), "API server port")
 
-	flag.StringVar(&cfg.db.dsn, "db-dsn", "", "PostgreSQL DSN")
+	flag.StringVar(&cfg.db.dsn, "db-dsn", os.Getenv("DATABASE_URL"), "PostgreSQL DSN")
 
-	flag.StringVar(&cfg.smtp.host, "smtp-host", "", "SMTP host")
-	flag.IntVar(&cfg.smtp.port, "smtp-port", 2525, "SMTP port")
-	flag.StringVar(&cfg.smtp.username, "smtp-username", "", "SMTP username")
-	flag.StringVar(&cfg.smtp.password, "smtp-password", "", "SMTP password")
-	flag.StringVar(&cfg.smtp.sender, "smtp-sender", "", "SMTP sender")
+	flag.StringVar(&cfg.smtp.host, "smtp-host", os.Getenv("API_SMTP_HOST"), "SMTP host")
+	flag.IntVar(&cfg.smtp.port, "smtp-port", getEnvInt("API_SMTP_PORT"), "SMTP port")
+	flag.StringVar(&cfg.smtp.username, "smtp-username", os.Getenv("API_SMTP_USERNAME"), "SMTP username")
+	flag.StringVar(&cfg.smtp.password, "smtp-password", os.Getenv("API_SMTP_PASSWORD"), "SMTP password")
+	flag.StringVar(&cfg.smtp.sender, "smtp-sender", os.Getenv("API_SMTP_SENDER"), "SMTP sender")
 
-	flag.Float64Var(&cfg.limiter.rps, "limiter-rps", 2, "Rate limiter maximum requests per second")
-	flag.IntVar(&cfg.limiter.burst, "limiter-burst", 4, "Rate limiter maximum burst")
-	flag.BoolVar(&cfg.limiter.enabled, "limiter-enabled", true, "Enable rate limiter")
+	flag.BoolVar(&cfg.limiter.enabled, "limiter-enabled", getEnvBool("API_LIMITER_ENABLED"), "Enable rate limiter")
+	flag.IntVar(&cfg.limiter.rps, "limiter-rps", getEnvInt("API_LIMITER_RPS"), "Rate limiter maximum requests per second")
+	flag.IntVar(&cfg.limiter.burst, "limiter-burst", getEnvInt("API_LIMITER_BURST"), "Rate limiter maximum burst")
 
 	flag.Func("cors-trusted-origins", "Trusted CORS origins (space separated)", func(val string) error {
+		if val == "" {
+			val = os.Getenv("API_CORS_TRUSTED_ORIGINS")
+		}
+
 		cfg.cors.trustedOrigins = strings.Fields(val)
 		return nil
 	})
@@ -84,15 +90,18 @@ func main() {
 	}
 
 	// Logger
-	h := newSlogHandler(cfg)
-	logger := slog.New(h)
+	h := newSlogHandler(cfg.dev)
+	logger = slog.New(h)
 	// Create error log for http.Server
 	errLog := slog.NewLogLogger(h, slog.LevelError)
+	if logger == nil {
+		log.Fatal("ded")
+	}
 
 	// PostgreSQL
 	pool, err := openPool(cfg.db.dsn)
 	if err != nil {
-		fatal(logger, err)
+		fatal(err)
 	}
 	defer pool.Close()
 
@@ -102,7 +111,7 @@ func main() {
 		Address: cfg.smtp.sender,
 	}
 	logger.Info("dialing SMTP server...")
-	mailer, err := mailer.New(
+	m, err := mailer.New(
 		cfg.smtp.host,
 		cfg.smtp.port,
 		cfg.smtp.username,
@@ -112,7 +121,7 @@ func main() {
 		"mail/*.tmpl",
 	)
 	if err != nil {
-		fatal(logger, err)
+		fatal(err)
 	}
 
 	expvar.NewString("version").Set(version)
@@ -126,13 +135,13 @@ func main() {
 	app := &application{
 		config: cfg,
 		logger: logger,
-		mailer: mailer,
+		mailer: m,
 		models: data.New(pool),
 	}
 
 	err = app.serve(errLog)
 	if err != nil {
-		fatal(logger, err)
+		fatal(err)
 	}
 }
 
@@ -162,8 +171,8 @@ func openPool(dsn string) (*pgxpool.Pool, error) {
 	return dbpool, err
 }
 
-func newSlogHandler(cfg config) slog.Handler {
-	if cfg.dev {
+func newSlogHandler(dev bool) slog.Handler {
+	if dev {
 		// Development text hanlder
 		return tint.NewHandler(os.Stdout, &tint.Options{
 			AddSource:  true,
@@ -208,7 +217,34 @@ func dbStats(st *pgxpool.Stat) poolStats {
 	}
 }
 
-func fatal(logger *slog.Logger, err error) {
+func fatal(err error) {
+	if logger == nil {
+		log.Fatalf("ded: %v", err)
+	}
+
 	logger.Error("fatal", slog.Any("err", err))
 	os.Exit(1)
+}
+
+func getEnvInt(key string) int {
+	val, ok := os.LookupEnv(key)
+	if !ok {
+		return 0
+	}
+
+	v, err := strconv.Atoi(val)
+	if err != nil {
+		log.Fatalf("getEnvInt(%v): %v", key, err)
+	}
+
+	return v
+}
+
+func getEnvBool(key string) bool {
+	val, ok := os.LookupEnv(key)
+	if !ok {
+		return false
+	}
+
+	return strings.ToLower(val) == "true"
 }

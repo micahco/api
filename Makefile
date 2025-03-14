@@ -1,5 +1,3 @@
-include .env
-
 ## help: print this help message
 .PHONY: help
 help:
@@ -21,7 +19,7 @@ audit:
 	go fmt ./...
 	@echo "Vetting code..."
 	go vet ./...
-	staticcheck ./...
+	go tool staticcheck ./...
 	@echo "Running tests..."
 	go test -race -vet=off ./...
 	
@@ -38,15 +36,7 @@ build:
 ## run: run the cmd/api application
 .PHONY: run
 run:
-	go run ./cmd/api -port=4000 -dev \
-		-db-dsn=${DATABASE_URL} \
-		-smtp-host=${API_SMTP_HOST} \
-		-smtp-port=${API_SMTP_PORT} \
-		-smtp-username=${API_SMTP_USERNAME} \
-		-smtp-password=${API_SMTP_PASSWORD} \
-		-smtp-sender=${API_SMTP_SENDER} \
-		-limiter-enabled=false \
-		-cors-trusted-origins=${API_CORS_TRUSTED_ORIGINS}
+	go run ./cmd/api -dev
 
 ## db/psql: connect to the database using psql
 .PHONY: db/psql
@@ -57,16 +47,16 @@ db/psql:
 .PHONY: db/migrations/new
 db/migrations/new:
 	@echo "Creating migration files for ${label}..."
-	migrate create -seq -ext=.sql -dir=./migrations ${label}
+	go tool migrate create -seq -ext=.sql -dir=./migrations ${label}
 
 ## db/migrations/up: apply all up database migrations
 .PHONY: db/migrations/up
 db/migrations/up: confirm
 	@echo "Running up migrations..."
-	migrate -path ./migrations -database ${DATABASE_URL} up
+	go tool migrate -path ./migrations -database ${DATABASE_URL} up
 
 ## db/migrations/drop: drop the entire databse schema
 .PHONY: db/migrations/drop
 db/migrations/drop:
 	@echo "Dropping the entire database schema..."
-	migrate -path ./migrations -database ${DATABASE_URL} drop
+	go tool migrate -path ./migrations -database ${DATABASE_URL} drop
